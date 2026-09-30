@@ -1,2 +1,2 @@
-import Platform from '@/components/platform';
-export default function Page(){return <Platform/>;}
+import CloudPlatform from '@/components/cloud-platform';
+export default function Page(){return <CloudPlatform/>;}
