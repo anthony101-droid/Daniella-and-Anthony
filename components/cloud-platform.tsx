@@ -9,7 +9,26 @@ export default function CloudPlatform(){
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[signup,setSignup]=useState(false),[status,setStatus]=useState('Loading workspace…');
  const revision=useRef(0),queue=useRef(Promise.resolve()),failed=useRef(false);
  useEffect(()=>{let live=true;void supabase.auth.getUser().then(({data})=>{if(live){setUser(data.user);setChecked(true);}});const {data}=supabase.auth.onAuthStateChange((_event,session)=>{if(live){setUser(session?.user??null);setChecked(true);}});return ()=>{live=false;data.subscription.unsubscribe();};},[]);
- useEffect(()=>{let live=true;setWorkspace(null);revision.current=0;failed.current=false;if(!user)return;void (async()=>{const {data,error}=await supabase.from('phishaware_workspaces').select('state,revision').eq('owner_id',user.id).maybeSingle();if(!live)return;if(error){setError(error.message);return;}if(data){revision.current=data.revision;setWorkspace(data.state as Workspace);}else{const state=emptyWorkspace();const {error}=await supabase.from('phishaware_workspaces').insert({owner_id:user.id,state});if(!live)return;if(error){setError(error.message);return;}revision.current=1;setWorkspace(state);}setStatus('Saved to Supabase');})();return ()=>{live=false;};},[user?.id]);
+ useEffect(()=>{
+  let live=true;
+  setWorkspace(null);setError('');setStatus('Loading workspace…');
+  revision.current=0;failed.current=false;
+  if(!user)return;
+  const owner=user.id;
+  void (async()=>{
+   // Concurrent initialization must preserve an existing workspace.
+   const {error:createError}=await supabase.from('phishaware_workspaces')
+    .upsert({owner_id:owner,state:emptyWorkspace()},{onConflict:'owner_id',ignoreDuplicates:true});
+   if(!live)return;
+   if(createError){setError(createError.message);setStatus('Workspace could not load');return;}
+   const {data,error:loadError}=await supabase.from('phishaware_workspaces')
+    .select('state,revision').eq('owner_id',owner).single();
+   if(!live)return;
+   if(loadError){setError(loadError.message);setStatus('Workspace could not load');return;}
+   revision.current=data.revision;setWorkspace(data.state as Workspace);setStatus('Saved to Supabase');
+  })().catch(()=>{if(live){setError('Unable to reach Supabase. Reload to try again.');setStatus('Workspace could not load');}});
+  return ()=>{live=false;};
+ },[user?.id]);
  function save(state:Workspace){if(!user)return;const owner=user.id;setStatus('Saving…');queue.current=queue.current.then(async()=>{if(failed.current)return;const old=revision.current;const {data,error}=await supabase.from('phishaware_workspaces').update({state,revision:old+1,updated_at:new Date().toISOString()}).eq('owner_id',owner).eq('revision',old).select('revision').maybeSingle();if(error||!data){failed.current=true;setStatus('Not saved');setError(error?.message??'This workspace changed in another browser. Reload before making more changes.');return;}revision.current=data.revision;setStatus('Saved to Supabase');}).catch(()=>{failed.current=true;setStatus('Not saved');setError('Connection interrupted. Reload and check your saved workspace.');});}
  async function authenticate(event:FormEvent<HTMLFormElement>){event.preventDefault();setBusy(true);setError('');const form=new FormData(event.currentTarget);const credentials={email:String(form.get('email')).trim(),password:String(form.get('password'))};const result=signup?await supabase.auth.signUp(credentials):await supabase.auth.signInWithPassword(credentials);setBusy(false);if(result.error)setError(result.error.message);else if(signup&&!result.data.session)setError('Check your email to confirm your account, then return here to sign in.');}
  if(!checked)return <main className="panel" style={{margin:'10vh auto',maxWidth:460,padding:32}}>Checking sign-in…</main>;
