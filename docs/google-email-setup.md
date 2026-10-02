@@ -57,7 +57,7 @@ Official references:
 
 ## Review workflow and interface
 
-Overview begins with the signed-in person's welcome and awareness summary. Email protection follows the summary and does not appear on Training, Simulation inbox, or Notifications. Settings provides password changes with current-password verification and Google disconnect controls. The sidebar footer contains the person's name and sign-out action.
+Overview begins with the signed-in person's welcome and awareness summary. Email protection is a dedicated navigation page directly after Overview and does not appear on Training, Simulation inbox, Notifications, or Settings. Opening it requests a mailbox check before showing results, reusing any scan completed within the last minute. Google authorization returns to this page. Settings lists name, email, company, and role, with a collapsed General options section to request a PhishAware password recovery email. Google connection and disconnect controls belong on Email protection. The sidebar footer contains the person's name and sign-out action.
 
 The shared mailbox model refreshes results every 15 seconds while visible, and immediately on focus. This refreshes the dashboard without starting an extra Gmail scan. The worker continues to scan one due mailbox per minute.
 

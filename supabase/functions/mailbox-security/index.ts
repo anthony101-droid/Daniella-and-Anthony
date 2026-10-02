@@ -110,7 +110,11 @@ Deno.serve(async req=>{
    }
    const {data:saved,error:saveError}=await db.rpc('phishaware_connect_mailbox',{owner:user.id,company,mailbox_email:user.email.toLowerCase(),cipher:await seal({refresh_token:tokens.refresh_token},user.id+':'+company),oauth_state_hash:await hash(input.state)});if(saveError||!saved){await fetch('https://oauth2.googleapis.com/revoke',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:tokens.refresh_token}),signal:AbortSignal.timeout(10000)});throw Error('Connection expired or cancelled. Start again.');}return reply({connected:true});
   }
-  if(input.action==='scan'){if(!box||box.status!=='connected')return reply({error:'Connect your Google mailbox first.'},409);if(box.last_scan_at&&Date.now()-new Date(box.last_scan_at).getTime()<60000)return reply({error:'Wait one minute before scanning again.'},429);return reply(await scan(box));}
+  if(input.action==='scan'||input.action==='scan-on-open'){
+   if(!box||box.status!=='connected'){if(input.action==='scan-on-open')return reply({processed:0,notConnected:true});return reply({error:'Connect your Google mailbox first.'},409);}
+   if(box.last_scan_at&&Date.now()-new Date(box.last_scan_at).getTime()<60000){if(input.action==='scan-on-open')return reply({processed:0,recent:true});return reply({error:'Wait one minute before scanning again.'},429);}
+   return reply(await scan(box));
+  }
   return reply({error:'Unknown action'},400);
  }catch(e){if(e instanceof Error&&e.message==='Request too large')return reply({error:e.message},413);return reply({error:e instanceof Error&& !('code' in e)?e.message:'Email operation failed. Try again.'},400);}
 });
