@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const exports={};vm.runInNewContext(ts.transpileModule(readFileSync('lib/reporting.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,Date,Error,Number});
+const range=(p,d)=>JSON.parse(JSON.stringify(exports.reportRange(p,d)));
+test('daily range crosses the year boundary',()=>assert.deepEqual(range('Daily','2026-12-31'),{start:'2026-12-31',end:'2027-01-01'}));
+test('weekly report starts Monday and includes Sunday',()=>assert.deepEqual(range('Weekly','2026-10-04'),{start:'2026-09-28',end:'2026-10-05'}));
+test('monthly range respects leap years',()=>assert.deepEqual(range('Monthly','2028-02-29'),{start:'2028-02-01',end:'2028-03-01'}));
+test('yearly report uses exclusive next-year boundary',()=>assert.deepEqual(range('Yearly','2026-10-02'),{start:'2026-01-01',end:'2027-01-01'}));
+test('yearly chart aggregates days by month without losing totals',()=>{const b=exports.reportBuckets('Yearly','2026-01-01','2027-01-01',[{day:'2026-10-01',scanned:3,low:1,medium:1,high:1,alerts:1,reports:0},{day:'2026-10-02',scanned:2,low:2,medium:0,high:0,alerts:0,reports:0}]);assert.equal(b.length,12);assert.equal(b[9].scanned,5);assert.equal(b[9].low,3);assert.equal(b[0].scanned,0);});

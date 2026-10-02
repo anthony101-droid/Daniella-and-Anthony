@@ -24,12 +24,14 @@ Deno.serve(async req=>{
    if(!admin||!access.platform_admin)return reply({error:'Platform administrator required'},403);
    const {data:creationAllowed,error:creationRateError}=await db.rpc('phishaware_take_rate',{bucket_key:'company-create:'+user.id,max_hits:10,window_seconds:3600});if(creationRateError)throw creationRateError;if(!creationAllowed)return reply({error:'Company creation limit reached. Retry in one hour.'},429);
    const name=String(input.name??'').trim(),target=String(input.adminEmail??'').trim().toLowerCase();
-   if(name.length<2||name.length>100||! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target))return reply({error:'Company name and valid administrator email required'},400);
+   if(name.length<2||name.length>100||! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target))return reply({error:'Organization name and valid individual email required'},400);
    const {data:existing,error:existingError}=await db.from('phishaware_access').select('email').eq('email',target).maybeSingle();if(existingError)throw existingError;
-   if(existing)return reply({error:'This email already belongs to a workspace. Use a separate company administrator email.'},409);
+   if(existing)return reply({error:'This email already belongs to a workspace. Use an email without an existing workspace.'},409);
+   const personName=String(input.personName??'').trim();if(input.personName!==undefined&&(personName.length<2||personName.length>100))return reply({error:'Individual name must contain 2 to 100 characters'},400);
    const id=crypto.randomUUID(),state=emptyWorkspace();state.organization=name;
-   const {error:companyError}=await db.from('phishaware_team').insert({id,state,revision:1});if(companyError)throw companyError;
-   const {error:memberError}=await db.from('phishaware_access').insert({email:target,company_id:id,role:'Administrator',status:'failed',invited_by:user.id});
+   if(personName)state.employees.push({id:crypto.randomUUID(),name:personName,email:target,department:'General',active:true,joined:new Date().toISOString()});
+   const {error:companyError}=await db.from('phishaware_team').insert({id,state,revision:1,audit_actor:email});if(companyError)throw companyError;
+   const {error:memberError}=personName?{error:null}:await db.from('phishaware_access').insert({email:target,company_id:id,role:'Administrator',status:'failed',invited_by:user.id});
    if(memberError){await db.from('phishaware_team').delete().eq('id',id);throw memberError;}
    return reply({companyId:id,name,adminEmail:target});
   }
@@ -38,6 +40,19 @@ Deno.serve(async req=>{
   if(!admin&&!employee)return reply({error:'Employee access is inactive. Contact your administrator.'},403);
   const view=()=>({workspace:admin?w:projection(w,employee!.id),revision:row.revision,role:access.role,employeeId:employee?.id??'',companyId,platformAdmin:!!access.platform_admin});
   if(input.action==='load'){const result=view();if(admin){const {data,error}=await db.from('phishaware_access').select('email,status,last_error,updated_at').eq('role','Employee').eq('company_id',companyId);if(error)throw error;const {data:companies,error:companyError}=await db.from('phishaware_team').select('id,state->>organization').order('updated_at',{ascending:false});if(companyError)throw companyError;return reply({...result,invitations:data,companies:access.platform_admin?companies.map(c=>({id:c.id,name:c.organization})):[],companyAdministrators:access.platform_admin?(await db.from('phishaware_access').select('email,status').eq('company_id',companyId).eq('role','Administrator')).data:[]});}return reply(result);}
+  if(input.action==='admin-metrics'){
+   if(!admin)return reply({error:'Administrator access required'},403);
+   if(typeof input.start!=='string'||typeof input.end!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(input.start)||!/^\d{4}-\d{2}-\d{2}$/.test(input.end)||!Number.isFinite(Date.parse(input.start))||!Number.isFinite(Date.parse(input.end))||Date.parse(input.end)<Date.parse(input.start)||Date.parse(input.end)-Date.parse(input.start)>366*86400000)return reply({error:'Select a valid report period of up to one year'},400);
+   const {data,error}=await db.from('phishaware_daily_metrics').select('day,scanned,low,medium,high,alerts,reports').eq('company_id',companyId).gte('day',input.start).lt('day',input.end).order('day');if(error)throw error;
+   const {data:first,error:firstError}=await db.from('phishaware_daily_metrics').select('day').eq('company_id',companyId).order('day').limit(1);if(firstError)throw firstError;
+   return reply({workspace:w,days:data,coverageStart:first?.[0]?.day??null});
+  }
+  if(input.action==='audit'){
+   if(!admin)return reply({error:'Administrator access required'},403);
+   const page=Number(input.page??0);if(!Number.isInteger(page)||page<0||page>100000)return reply({error:'Invalid audit page'},400);
+   const {data,error}=await db.from('phishaware_audit').select('id,date,actor,category,action,source').eq('company_id',companyId).order('date',{ascending:false}).order('id').range(page*100,page*100+100);if(error)throw error;
+   return reply({events:(data??[]).slice(0,100),hasMore:(data??[]).length>100});
+  }
   if(input.action==='invite-admin'){
    if(!admin)return reply({error:'Administrator access required'},403);
    const {data:inviteAllowed,error:inviteRateError}=await db.rpc('phishaware_take_rate',{bucket_key:'admin-invite:'+user.id+':'+String(input.email),max_hits:1,window_seconds:60});if(inviteRateError)throw inviteRateError;if(!inviteAllowed)return reply({error:'Wait one minute before resending.'},429);
@@ -83,7 +98,7 @@ Deno.serve(async req=>{
     const c=next.completions.find(c=>c.employeeId===employee!.id&&c.moduleId===module.id);if(c){c.score=Math.max(c.score,score);c.attempts++;c.date=new Date().toISOString();}else next.completions.push({employeeId:employee!.id,moduleId:module.id,score,attempts:1,date:new Date().toISOString()});log(next,employee!.name,`Submitted ${module.title}: ${score}%`,'Training');
    }else return reply({error:'Invalid employee action'},400);
   }else return reply({error:'Unknown action'},400);
-  const {data:saved,error:saveError}=await db.from('phishaware_team').update({state:next,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('id',companyId).eq('revision',row.revision).select('revision').maybeSingle();if(saveError)throw saveError;if(!saved)return reply({error:'Workspace changed. Retry after reloading.'},409);
+  const {data:saved,error:saveError}=await db.from('phishaware_team').update({state:next,audit_actor:email,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('id',companyId).eq('revision',row.revision).select('revision').maybeSingle();if(saveError)throw saveError;if(!saved)return reply({error:'Workspace changed. Retry after reloading.'},409);
   return reply({workspace:admin?next:projection(next,employee!.id),revision:saved.revision});
  }catch(error){if(error instanceof Error&&error.message==='Request too large')return reply({error:error.message},413);return reply({error:error instanceof Error&&!('code' in error)?error.message:'Request failed. Please retry.'},400);}
 });
