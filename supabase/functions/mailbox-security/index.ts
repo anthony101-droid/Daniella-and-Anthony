@@ -65,13 +65,28 @@ Deno.serve(async req=>{
    if(box){try{const t=await unseal(box.token_cipher,user.id+':'+box.company_id);await fetch('https://oauth2.googleapis.com/revoke',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:t.refresh_token}),signal:AbortSignal.timeout(10000)});}catch{}}
    for(const table of ['phishaware_oauth_states','phishaware_mailboxes','phishaware_email_findings']){const {error}=await db.from(table).delete().eq('user_id',user.id);if(error)throw Error('Unable to remove connection data. Try again.');}return reply({disconnected:true});
   }
-  const {data:a,error:accessError}=await db.from('phishaware_access').select('company_id').eq('email',user.email.toLowerCase()).maybeSingle();if(accessError||!a)return reply({error:'Invited account required'},403);
+  const {data:a,error:accessError}=await db.from('phishaware_access').select('company_id,role,platform_admin').eq('email',user.email.toLowerCase()).maybeSingle();if(accessError||!a)return reply({error:'Invited account required'},403);
   const company=a.company_id;await eligibility(user.id,user.email,company);
+  const alertCompany=typeof input.companyId==='string'?input.companyId:company;
+  if(alertCompany!==company&&!a.platform_admin)return reply({error:'Company access denied'},403);
   const {data:allowed,error:rateError}=await db.rpc('phishaware_take_rate',{bucket_key:'mailbox:'+user.id,max_hits:30,window_seconds:60});if(rateError)throw Error('Unable to check request limits.');if(!allowed)return reply({error:'Too many requests. Retry in one minute.'},429);
   const {data:box,error:boxError}=await db.from('phishaware_mailboxes').select('*').eq('user_id',user.id).eq('company_id',company).maybeSingle();if(boxError)throw Error('Unable to load connection.');
   if(input.action==='status'){
-   const {data:findings,error}=await db.from('phishaware_email_findings').select('message_id,subject,sender,received_at,scanned_at,risk,reasons,recommendation').eq('user_id',user.id).eq('company_id',company).order('received_at',{ascending:false}).limit(100);if(error)throw Error('Unable to load findings.');
-   return reply({configured:configured(),automaticScanning:Deno.env.get('MAILBOX_SCHEDULE_ENABLED')==='true',connection:box?{email:box.email,status:box.status,connectedAt:box.connected_at,lastScanAt:box.last_scan_at,lastError:box.last_error}:null,findings});
+   const {data:findings,error}=await db.from('phishaware_email_findings').select('message_id,subject,sender,received_at,scanned_at,risk,reasons,recommendation,review_state,reviewed_at').eq('user_id',user.id).eq('company_id',company).order('received_at',{ascending:false}).limit(100);if(error)throw Error('Unable to load findings.');
+   const {data:alerts,error:alertsError}=a.role==='Administrator'?await db.from('phishaware_email_alerts').select('id,message_id,employee_email,subject,sender,risk,reasons,recommendation,source,status,created_at,resolved_at').eq('company_id',alertCompany).order('status').order('created_at',{ascending:false}).limit(100):{data:[],error:null};
+   if(alertsError)throw Error('Unable to load notifications.');
+   return reply({alerts:a.role==='Administrator'?alerts:[],configured:configured(),automaticScanning:Deno.env.get('MAILBOX_SCHEDULE_ENABLED')==='true',connection:box?{email:box.email,status:box.status,connectedAt:box.connected_at,lastScanAt:box.last_scan_at,lastError:box.last_error}:null,findings});
+  }
+  if(input.action==='review'){
+   if(typeof input.messageId!=='string'||!input.messageId||input.messageId.length>200||!['reviewed','reported'].includes(input.decision))return reply({error:'Invalid review'},400);
+   const {data:saved,error}=await db.rpc('phishaware_review_finding',{owner:user.id,company,message:input.messageId,decision:input.decision});
+   if(error)throw Error('Unable to save review.');if(!saved)return reply({error:'Email finding unavailable'},404);return reply({saved:true});
+  }
+  if(input.action==='resolve-alert'){
+   if(a.role!=='Administrator')return reply({error:'Administrator access required'},403);
+   if(typeof input.alertId!=='string'||!/^[a-f0-9-]{36}$/i.test(input.alertId))return reply({error:'Invalid alert'},400);
+   const {data:saved,error}=await db.from('phishaware_email_alerts').update({status:'resolved',resolved_at:new Date().toISOString()}).eq('id',input.alertId).eq('company_id',alertCompany).eq('status','open').select('id').maybeSingle();
+   if(error)throw Error('Unable to resolve alert.');if(!saved)return reply({error:'Open company alert unavailable'},404);return reply({resolved:true});
   }
   if(!configured())return reply({error:'Google email connection is awaiting administrator setup.'},503);
   if(input.action==='connect'){

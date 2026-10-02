@@ -8,9 +8,9 @@ Implemented code is deployed to Supabase, but mailbox connections stay unavailab
 - Permission is `https://www.googleapis.com/auth/gmail.readonly` only. Drive, Calendar, contacts, send, delete, and administrative Workspace access are not requested.
 - OAuth uses authorization code flow with PKCE, a hashed single-use state, a 10-minute expiry, and verified account and company bindings.
 - Refresh tokens are encrypted using AES-256-GCM with user and company as authenticated context. Tokens never reach the frontend, source control, or application logs.
-- Message bodies are processed transiently. Attachments are not downloaded. Sender, subject, timestamp, risk indicators, and recommendations are saved only for the mailbox owner.
-- Administrators manage company staff and simulations but cannot retrieve employees' mailbox findings through the application.
-- Disconnect revokes the Google token and removes stored findings and local credentials. Google revocation failures do not retain local tokens. Users can also revoke access from their Google Account permissions.
+- Message bodies are processed transiently. Attachments are not downloaded. Sender, subject, timestamp, risk indicators, recommendations, and employee review decisions are saved for the mailbox owner.
+- Company administrators receive a summary for every High risk finding and every email an employee explicitly reports. The summary includes the employee email, sender, subject, risk, reasons, and suggested action. All other mailbox findings remain private to their owner. No message bodies, attachments, or mailbox credentials are shared.
+- Disconnect revokes the Google token and removes stored findings, shared alerts, and local credentials. Google revocation failures do not retain local tokens. Users can also revoke access from their Google Account permissions.
 - Findings are removed after 30 days by the background maintenance job. Until the schedule is enabled, automatic retention cleanup is not running.
 
 ## Google Cloud configuration
@@ -54,3 +54,13 @@ Official references:
 - https://developers.google.com/workspace/gmail/api/auth/scopes
 - https://developers.google.com/workspace/gmail/api/guides/push
 - https://supabase.com/docs/guides/functions/schedule-functions
+
+## Review workflow and interface
+
+Overview begins with the signed-in person's welcome and awareness summary. Email protection follows the summary and does not appear on Training, Simulation inbox, or Notifications. Settings provides password changes with current-password verification and Google disconnect controls. The sidebar footer contains the person's name and sign-out action.
+
+The shared mailbox model refreshes results every 15 seconds while visible, and immediately on focus. This refreshes the dashboard without starting an extra Gmail scan. The worker continues to scan one due mailbox per minute.
+
+Save as reviewed stores a review decision without declaring an email safe. Report suspicious requests confirmation before sharing a summary with company administrators. Administrators see automatic High risk findings and reports under Notifications and can mark an alert resolved. Repeated reports do not duplicate an alert. Only the owning employee can save a finding review, and only administrators of that company can resolve alerts.
+
+Apply email-review-alerts.sql after the base company-mailbox-security.sql when bootstrapping a new project.
