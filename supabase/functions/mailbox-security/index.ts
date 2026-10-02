@@ -72,10 +72,16 @@ Deno.serve(async req=>{
   const {data:allowed,error:rateError}=await db.rpc('phishaware_take_rate',{bucket_key:'mailbox:'+user.id,max_hits:30,window_seconds:60});if(rateError)throw Error('Unable to check request limits.');if(!allowed)return reply({error:'Too many requests. Retry in one minute.'},429);
   const {data:box,error:boxError}=await db.from('phishaware_mailboxes').select('*').eq('user_id',user.id).eq('company_id',company).maybeSingle();if(boxError)throw Error('Unable to load connection.');
   if(input.action==='status'){
-   const {data:findings,error}=await db.from('phishaware_email_findings').select('message_id,subject,sender,received_at,scanned_at,risk,reasons,recommendation,review_state,reviewed_at').eq('user_id',user.id).eq('company_id',company).order('received_at',{ascending:false}).limit(100);if(error)throw Error('Unable to load findings.');
+   const {data:findings,error}=await db.from('phishaware_email_findings').select('message_id,subject,sender,received_at,scanned_at,risk,reasons,recommendation,review_state,reviewed_at,notification_read').eq('user_id',user.id).eq('company_id',company).order('received_at',{ascending:false}).limit(100);if(error)throw Error('Unable to load findings.');
    const {data:alerts,error:alertsError}=a.role==='Administrator'?await db.from('phishaware_email_alerts').select('id,message_id,employee_email,subject,sender,risk,reasons,recommendation,source,status,created_at,resolved_at').eq('company_id',alertCompany).order('status').order('created_at',{ascending:false}).limit(100):{data:[],error:null};
    if(alertsError)throw Error('Unable to load notifications.');
-   return reply({alerts:a.role==='Administrator'?alerts:[],configured:configured(),automaticScanning:Deno.env.get('MAILBOX_SCHEDULE_ENABLED')==='true',connection:box?{email:box.email,status:box.status,connectedAt:box.connected_at,lastScanAt:box.last_scan_at,lastError:box.last_error}:null,findings});
+   const {data:reads,error:readsError}=a.role==='Administrator'?await db.from('phishaware_alert_reads').select('alert_id').eq('user_id',user.id).eq('company_id',alertCompany).limit(10000):{data:[],error:null};if(readsError)throw Error('Unable to load notification receipts.');const readIds=new Set((reads??[]).map((r:{alert_id:string})=>r.alert_id));
+   return reply({alerts:a.role==='Administrator'?(alerts??[]).map((r:{id:string})=>({...r,notification_read:readIds.has(r.id)})):[],configured:configured(),automaticScanning:Deno.env.get('MAILBOX_SCHEDULE_ENABLED')==='true',connection:box?{email:box.email,status:box.status,connectedAt:box.connected_at,lastScanAt:box.last_scan_at,lastError:box.last_error}:null,findings});
+  }
+  if(input.action==='read-notification'){
+   if(input.all!==true && (a.role==='Administrator'?typeof input.alertId!=='string'||!/^[a-f0-9-]{36}$/i.test(input.alertId):typeof input.messageId!=='string'||!input.messageId||input.messageId.length>200))return reply({error:'Invalid notification'},400);
+   const {error}=await db.rpc('phishaware_read_notifications',{owner:user.id,company:a.role==='Administrator'?alertCompany:company,administrator:a.role==='Administrator',notification:input.all===true?null:a.role==='Administrator'?input.alertId:input.messageId});
+   if(error)throw Error('Unable to mark notifications as read.');return reply({read:true});
   }
   if(input.action==='review'){
    if(typeof input.messageId!=='string'||!input.messageId||input.messageId.length>200||!['reviewed','reported'].includes(input.decision))return reply({error:'Invalid review'},400);
