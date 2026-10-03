@@ -86,3 +86,5 @@ body{background:#f4f5f2;color:#243633}.dashboard-main{background:#f4f5f2}.app-si
 
 /* Revised page-specific imagery. */
 .redesigned-home .hero-photo{height:420px;background:#e8e9e1}.redesigned-home .hero-photo>img{object-fit:cover;object-position:center 35%}.phish-auth-photo>img{background:#f64d20;object-fit:contain;object-position:center}.page-art-protection{background:#f6f3eb}.page-art-protection img{object-fit:contain}.page-art-simulation{background:#e7e9e2}.page-art-simulation img{object-fit:cover;object-position:center 30%}.page-art-notifications{background:#050c16}.page-art-notifications img{object-fit:contain}.training-intro-art img{object-position:center 35%}@media(max-width:760px){.redesigned-home .hero-photo{height:340px}.training-intro-art{height:175px}}@media(max-width:420px){.redesigned-home .hero-photo{height:300px}}
+/* Keep both colleagues' faces clear of the caption. */
+.redesigned-home .hero-photo>img{object-position:center 48%}
