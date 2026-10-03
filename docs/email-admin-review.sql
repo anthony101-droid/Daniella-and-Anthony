@@ -6,30 +6,31 @@ alter table public.phishaware_email_alerts add column if not exists resolved_by 
 alter table public.phishaware_notification_history add column if not exists review_outcome text check(review_outcome in ('safe','action_taken'));
 alter table public.phishaware_notification_history add column if not exists review_note text;
 alter table public.phishaware_notification_history add column if not exists admin_reviewed_at timestamptz;
+alter table public.phishaware_email_findings add column if not exists review_requested_at timestamptz;
 alter table public.phishaware_email_findings add column if not exists review_outcome text check(review_outcome in ('safe','action_taken'));
 alter table public.phishaware_email_findings add column if not exists review_note text;
 alter table public.phishaware_email_findings add column if not exists admin_reviewed_at timestamptz;
 
 create or replace function public.phishaware_review_finding(owner uuid,company text,message text,decision text)
 returns boolean language plpgsql security invoker set search_path='' as $$
-declare alert public.phishaware_email_alerts; previous text;
+declare alert public.phishaware_email_alerts; previous text; previously_requested boolean;
 begin
  if decision not in ('reviewed','reported') then return false; end if;
  perform 1 from public.phishaware_mailboxes where user_id=owner and company_id=company for update;
  if not found then return false; end if;
- select review_state into previous from public.phishaware_email_findings where user_id=owner and company_id=company and message_id=message for update;
+ select review_state,review_requested_at is not null into previous,previously_requested from public.phishaware_email_findings where user_id=owner and company_id=company and message_id=message for update;
  if not found then return false; end if;
  select * into alert from public.phishaware_email_alerts where user_id=owner and message_id=message;
  -- A duplicate click must not reopen an administrator's completed review.
  if alert.status='resolved' then return true; end if;
- update public.phishaware_email_findings set review_state=case when previous='reported' then previous else decision end,reviewed_at=now()
+ update public.phishaware_email_findings set review_state=case when previous='reported' then previous else decision end,reviewed_at=now(),review_requested_at=coalesce(review_requested_at,now())
  where user_id=owner and company_id=company and message_id=message;
  insert into public.phishaware_email_alerts(user_id,message_id,company_id,employee_email,subject,sender,risk,reasons,recommendation,source,request_kind)
  select f.user_id,f.message_id,f.company_id,m.email,f.subject,f.sender,f.risk,f.reasons,f.recommendation,'employee',case when decision='reviewed' then 'review' else 'report' end
  from public.phishaware_email_findings f join public.phishaware_mailboxes m on m.user_id=f.user_id and m.company_id=f.company_id
  where f.user_id=owner and f.company_id=company and f.message_id=message
  on conflict(user_id,message_id) do update set request_kind=case when excluded.request_kind='report' then 'report' else phishaware_email_alerts.request_kind end;
- if decision='reviewed' and previous='unreviewed' then
+ if decision='reviewed' and not previously_requested then
   perform public.phishaware_queue_notice(company,'review-request:'||owner||':'||message,'PhishAware: email review requested',E'An employee requested an email review. Sign in to Notifications to review the summary.\nhttps://daniella-and-anthony.terkperkanthony101.workers.dev/');
  end if;
  return true;
@@ -62,3 +63,6 @@ grant execute on function public.phishaware_complete_email_review(uuid,text,text
 
 -- Remove the unused earlier signature, which depended on direct Auth table reads.
 drop function if exists public.phishaware_complete_email_review(uuid,text,uuid,text,text);
+
+-- Recognize requests already created, without sharing older local reviews.
+update public.phishaware_email_findings f set review_requested_at=a.created_at from public.phishaware_email_alerts a where a.user_id=f.user_id and a.message_id=f.message_id and a.source='employee' and f.review_requested_at is null;
