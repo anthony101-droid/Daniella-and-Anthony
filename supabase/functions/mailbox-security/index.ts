@@ -77,8 +77,8 @@ Deno.serve(async req=>{
    const {data,error}=await db.rpc('phishaware_search_notifications',{owner:user.id,company,history:input.history===true,query,page});if(error)throw Error('Unable to search notification history.');return reply({items:(data??[]).slice(0,100),hasMore:(data??[]).length>100});
   }
   if(input.action==='status'){
-   const {data:findings,error}=await db.from('phishaware_email_findings').select('message_id,subject,sender,received_at,scanned_at,risk,reasons,recommendation,review_state,reviewed_at,notification_read').eq('user_id',user.id).eq('company_id',company).order('received_at',{ascending:false}).limit(100);if(error)throw Error('Unable to load findings.');
-   const {data:alerts,error:alertsError}=a.role==='Administrator'?await db.from('phishaware_email_alerts').select('id,message_id,employee_email,subject,sender,risk,reasons,recommendation,source,status,created_at,resolved_at').eq('company_id',alertCompany).order('status').order('created_at',{ascending:false}).limit(100):{data:[],error:null};
+   const {data:findings,error}=await db.from('phishaware_email_findings').select('message_id,subject,sender,received_at,scanned_at,risk,reasons,recommendation,review_state,reviewed_at,notification_read,review_outcome,review_note,admin_reviewed_at').eq('user_id',user.id).eq('company_id',company).order('received_at',{ascending:false}).limit(100);if(error)throw Error('Unable to load findings.');
+   const {data:alerts,error:alertsError}=a.role==='Administrator'?await db.from('phishaware_email_alerts').select('id,message_id,employee_email,subject,sender,risk,reasons,recommendation,source,status,created_at,resolved_at,request_kind,review_outcome,review_note').eq('company_id',alertCompany).order('status').order('created_at',{ascending:false}).limit(100):{data:[],error:null};
    if(alertsError)throw Error('Unable to load notifications.');
    const {data:reads,error:readsError}=a.role==='Administrator'?await db.from('phishaware_alert_reads').select('alert_id').eq('user_id',user.id).eq('company_id',alertCompany).limit(10000):{data:[],error:null};if(readsError)throw Error('Unable to load notification receipts.');const readIds=new Set((reads??[]).map((r:{alert_id:string})=>r.alert_id));
    const {data:notificationCount,error:countError}=await db.rpc('phishaware_notification_count',{owner:user.id,company});if(countError)throw Error('Unable to count notifications.');
@@ -97,8 +97,10 @@ Deno.serve(async req=>{
   if(input.action==='resolve-alert'){
    if(a.role!=='Administrator')return reply({error:'Administrator access required'},403);
    if(typeof input.alertId!=='string'||!/^[a-f0-9-]{36}$/i.test(input.alertId))return reply({error:'Invalid alert'},400);
-   const {data:saved,error}=await db.from('phishaware_email_alerts').update({status:'resolved',resolved_at:new Date().toISOString()}).eq('id',input.alertId).eq('company_id',alertCompany).eq('status','open').select('id').maybeSingle();
-   if(error)throw Error('Unable to resolve alert.');if(!saved)return reply({error:'Open company alert unavailable'},404);return reply({resolved:true});
+   const outcome=input.outcome??'action_taken',note=typeof input.note==='string'?input.note.trim():'';
+   if(!['safe','action_taken'].includes(outcome)||note.length>1000||(outcome==='action_taken'&&note.length<3))return reply({error:'Choose a review outcome and describe the action taken.'},400);
+   const {data:saved,error}=await db.rpc('phishaware_complete_email_review',{actor:user.id,actor_email:user.email.toLowerCase(),company:alertCompany,alert_id:input.alertId,outcome,note});
+   if(error)throw Error('Unable to complete email review.');if(!saved)return reply({error:'Open company alert unavailable or access denied'},409);return reply({resolved:true});
   }
   if(!configured())return reply({error:'Google email connection is awaiting administrator setup.'},503);
   if(input.action==='connect'){

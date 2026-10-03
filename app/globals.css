@@ -138,4 +138,26 @@ h1,h2,h3{color:#0F2742}
 .next-action,.lesson-tip,.training-scenario,.quiz-option:has([data-state=checked]){background:#F5F9FC;color:#263238}
 .training-course .quiz-option:has(input:checked){background:#EAF5EF;border-color:#167A45;color:#263238}
 input[type=checkbox],input[type=radio],progress{accent-color:#167A45}
+.google-mailbox{position:relative;padding-top:30px;background:#FFFFFF;border-color:#D9E4EC;box-shadow:0 2px 8px #0F274208}
+.google-colour-bar{position:absolute;top:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,1fr);height:4px}
+.google-colour-bar span:nth-child(1){background:#4285F4}.google-colour-bar span:nth-child(2){background:#EA4335}.google-colour-bar span:nth-child(3){background:#FBBC05}.google-colour-bar span:nth-child(4){background:#34A853}
+.google-mailbox .protection-icon{background:#E8F0FE;color:#1967D2}
+.google-mailbox .primary-button{background:#1967D2;border-color:#1967D2;color:#FFFFFF}
+.google-mailbox .primary-button:hover{background:#174EA6;border-color:#174EA6}
+.google-mailbox .save-review-button{color:#1967D2;border-color:#1967D2;background:#FFFFFF}
+.google-mailbox .save-review-button:hover{background:#E8F0FE}
+.google-mailbox .report-button{color:#C62828;border-color:#C62828;background:#FFFFFF}
+.google-mailbox .report-button:hover{background:#FDECEC}
+.google-mailbox .finding-card{background:#FFFFFF;border-radius:12px}
+.google-mailbox .mailbox-meta{background:#F5F9FC;border-radius:8px;padding:12px 14px}
+.google-mailbox .finding-actions>a{color:#1967D2;padding:10px 14px;border:1px solid #D9E4EC;border-radius:6px;background:#FFFFFF}
+.admin-review-controls{border-top:1px solid #D9E4EC;padding-top:16px;margin-top:16px}
+.admin-review-controls label{display:block;font-size:14px;font-weight:550}
+.admin-review-controls textarea{display:block;width:100%;min-height:90px;margin-top:8px;resize:vertical}
+.admin-review-result{margin-top:14px;padding:14px;border:1px solid #D9E4EC;border-radius:8px;background:#F5F9FC}
+.admin-review-result strong{display:flex;align-items:center;gap:8px;color:#0F2742}
+.admin-review-result.review-safe{background:#EAF5EF;border-color:#167A45}
+.admin-review-result.review-safe strong{color:#167A45}
+.admin-review-result p{color:#263238;margin:6px 0;font-size:14px}
+.admin-review-result .review-rating-note{font-size:12px;color:#526474}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,.public-home :focus-visible,.redesigned-home a:focus-visible,.redesigned-home button:focus-visible{outline:3px solid #167A45;outline-offset:4px}
