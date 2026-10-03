@@ -7,6 +7,7 @@ const headers={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Header
 const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false,autoRefreshToken:false}});
 function reply(body:unknown,status=200){return new Response(JSON.stringify(body),{status,headers});}
 function projection(w:Workspace,id:string):Workspace{const deliveries=w.deliveries.filter(d=>d.employeeId===id),ids=new Set(deliveries.map(d=>d.campaignId));return {...w,employees:w.employees.filter(e=>e.id===id),campaigns:w.campaigns.filter(c=>ids.has(c.id)),deliveries,completions:w.completions.filter(c=>c.employeeId===id),notices:w.notices.filter(n=>n.employeeId===id),events:[]};}
+async function courseRecord(owner:string,company:string){const {data,error}=await db.rpc('phishaware_award_course',{owner,company});return error?{certificate:null,certificatePending:true}:{certificate:data??null,certificatePending:false};}
 Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response(null,{headers});
  if(req.method!=='POST')return reply({error:'Method not allowed'},405);
@@ -40,7 +41,7 @@ Deno.serve(async req=>{
   const w=row.state as Workspace;const employee=w.employees.find(e=>e.id===access.employee_id&&e.email.toLowerCase()===email&&e.active);
   if(!admin&&!employee)return reply({error:'Employee access is inactive. Contact your administrator.'},403);
   const view=()=>({workspace:admin?w:projection(w,employee!.id),revision:row.revision,role:access.role,employeeId:employee?.id??'',companyId,platformAdmin:!!access.platform_admin});
-  if(input.action==='load'){const result=view();if(admin){const {data,error}=await db.from('phishaware_access').select('email,status,last_error,updated_at').eq('role','Employee').eq('company_id',companyId);if(error)throw error;const {data:companies,error:companyError}=await db.from('phishaware_team').select('id,state->>organization').order('updated_at',{ascending:false});if(companyError)throw companyError;return reply({...result,invitations:data,companies:access.platform_admin?companies.map(c=>({id:c.id,name:c.organization})):[],companyAdministrators:access.platform_admin?(await db.from('phishaware_access').select('email,status').eq('company_id',companyId).eq('role','Administrator')).data:[]});}return reply(result);}
+  if(input.action==='load'){const result=view();if(admin){const {data,error}=await db.from('phishaware_access').select('email,status,last_error,updated_at').eq('role','Employee').eq('company_id',companyId);if(error)throw error;const {data:companies,error:companyError}=await db.from('phishaware_team').select('id,state->>organization').order('updated_at',{ascending:false});if(companyError)throw companyError;return reply({...result,invitations:data,companies:access.platform_admin?companies.map(c=>({id:c.id,name:c.organization})):[],companyAdministrators:access.platform_admin?(await db.from('phishaware_access').select('email,status').eq('company_id',companyId).eq('role','Administrator')).data:[]});}return reply({...result,...await courseRecord(user.id,companyId)});}
   if(input.action==='support-submit'){
    const category=String(input.category??''),target=String(input.target??''),subject=String(input.subject??'').trim(),message=String(input.message??'').trim();
    if(!['Complaint','Feedback','Help request'].includes(category)||!['company','platform'].includes(target)||subject.length<3||subject.length>160||message.length<10||message.length>4000)return reply({error:'Complete the subject and message within the allowed lengths.'},400);
@@ -107,6 +108,8 @@ Deno.serve(async req=>{
    next=input.workspace;
    if(!next||next.version!==1||typeof next.organization!=='string'||!['employees','campaigns','deliveries','completions','events','notices'].every(k=>Array.isArray((next as unknown as Record<string,unknown>)[k])))return reply({error:'Invalid workspace'},400);
    if(next.employees.some(e=>typeof e.email!=='string'||typeof e.id!=='string')||new Set(next.employees.map(e=>e.email.toLowerCase())).size!==next.employees.length)return reply({error:'Employee emails must be unique'},400);
+   // Training scores are written only by verified employee quiz submissions.
+   next.completions=w.completions.filter(c=>next.employees.some(e=>e.id===c.employeeId&&w.employees.some(old=>old.id===e.id&&old.email.toLowerCase()===e.email.toLowerCase())));
   }else if(input.action==='employee'){
    if(admin)return reply({error:'Employee account required'},403);
    next=structuredClone(w);
@@ -118,6 +121,6 @@ Deno.serve(async req=>{
    }else return reply({error:'Invalid employee action'},400);
   }else return reply({error:'Unknown action'},400);
   const {data:saved,error:saveError}=await db.from('phishaware_team').update({state:next,audit_actor:email,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('id',companyId).eq('revision',row.revision).select('revision').maybeSingle();if(saveError)throw saveError;if(!saved)return reply({error:'Workspace changed. Retry after reloading.'},409);
-  return reply({workspace:admin?next:projection(next,employee!.id),revision:saved.revision});
+  return reply({workspace:admin?next:projection(next,employee!.id),revision:saved.revision,...(!admin&&input.kind==='quiz'?await courseRecord(user.id,companyId):{})});
  }catch(error){if(error instanceof Error&&error.message==='Request too large')return reply({error:error.message},413);return reply({error:error instanceof Error&&!('code' in error)?error.message:'Request failed. Please retry.'},400);}
 });

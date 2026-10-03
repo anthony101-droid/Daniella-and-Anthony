@@ -1,4 +1,4 @@
-"""Rebuild the public handbook from the application's canonical lesson data."""
+"""Rebuild the administrator handbook from the application's canonical lesson data."""
 from pathlib import Path
 import json
 from html import escape
@@ -9,7 +9,7 @@ from reportlab.lib.pagesizes import A4
 root=Path(__file__).resolve().parents[1]
 s=(root/'lib/platform.ts').read_text()
 lessons=json.loads(s.split('export const modules:TrainingModule[]=')[1].split(';\nexport function gradeTraining')[0])
-out=root/'public/training/phishaware-training-handbook.pdf'
+out=root/'docs/training/phishaware-training-handbook.pdf'
 styles={
  'title':ParagraphStyle('title',fontName='Helvetica-Bold',fontSize=30,leading=35,textColor=HexColor('#244b39'),spaceAfter=20),
  'heading':ParagraphStyle('heading',fontName='Helvetica-Bold',fontSize=20,leading=24,textColor=HexColor('#244b39'),spaceAfter=12),

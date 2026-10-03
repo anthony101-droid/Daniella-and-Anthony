@@ -1,6 +1,7 @@
 export type Employee={id:string;name:string;email:string;department:string;active:boolean;joined:string};
 export type Campaign={id:string;name:string;templateId:string;subject:string;sender:string;body:string;department:string;status:'Draft'|'Active'|'Completed';created:string;launched?:string;due:string};
 export type Delivery={id:string;campaignId:string;employeeId:string;opened:boolean;clicked:boolean;reported:boolean;created:string};
+export type CourseCertificate={id:string;courseTitle:string;employeeName:string;companyName:string;issuedAt:string;moduleIds:string[]};
 export type Completion={employeeId:string;moduleId:string;score:number;attempts:number;date:string};
 export type Event={id:string;actor:string;action:string;type:'Campaign'|'Employee'|'Training'|'Simulation'|'Settings';date:string};
 export type Notice={id:string;employeeId:string;text:string;read:boolean;date:string};
