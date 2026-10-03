@@ -215,3 +215,42 @@ html,body{width:100%;max-width:100%;overflow-x:clip}
  .module-grid,.training-intro{grid-template-columns:minmax(0,1fr)}.module-card,.training-intro>*{min-width:0}.report-bar{grid-template-columns:85px minmax(0,1fr) 28px}
  .account-button .avatar,.org-icon{flex-shrink:0}
 }
+
+/* Phone records use cards instead of a compressed desktop table. */
+.responsive-records{width:100%;min-width:0;max-width:100%}
+.record-card-view{display:none}
+html,body{overflow-x:hidden;overscroll-behavior-x:none}
+body{position:relative}
+@media(max-width:767px){
+ [data-slot="sidebar-wrapper"]{width:100%;min-width:0;overflow-x:hidden}
+ [data-slot="sidebar-inset"].dashboard-main{flex:1 1 0%;min-width:0;width:100%;max-width:100%;margin:0;overflow-x:hidden}
+ .responsive-records .record-table-view{display:none}
+ .responsive-records .record-card-view{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;padding:16px}
+ .mobile-record{min-width:0;padding:18px 16px;border:1px solid #D9E4EC;border-radius:10px;background:#FFFFFF}
+ .mobile-record-identity{min-width:0;border-bottom:1px solid #D9E4EC;padding-bottom:16px;margin-bottom:14px}
+ .mobile-record .person{min-width:0;width:100%;align-items:flex-start;gap:12px}
+ .mobile-record .person>div:last-child{min-width:0;flex:1}
+ .mobile-record .person strong{display:block;font-size:16px;line-height:1.5;white-space:normal;overflow-wrap:break-word}
+ .mobile-record .person small{display:block;font-size:14px;line-height:1.6;overflow-wrap:anywhere;margin-top:3px}
+ .mobile-record dl{margin:0;display:grid;grid-template-columns:minmax(0,1fr);gap:13px}
+ .mobile-record-field{display:grid;grid-template-columns:100px minmax(0,1fr);align-items:start;gap:12px;min-width:0}
+ .mobile-record dt{font-size:13px;color:#526474;line-height:1.6}
+ .mobile-record dd{margin:0;min-width:0;font-size:14px;color:#0F2742;line-height:1.6;overflow-wrap:anywhere}
+ .mobile-record-actions{grid-template-columns:minmax(0,1fr);padding-top:12px;border-top:1px solid #D9E4EC}
+ .mobile-record .table-actions{flex-direction:row;flex-wrap:wrap;gap:14px;align-items:center}
+ .mobile-record .mini-progress{width:100%;min-width:0;max-width:100%}
+ .toolbar{padding:16px;align-items:stretch;gap:14px}
+ .toolbar .searchbox{width:100%;flex:1 1 100%;min-width:0;max-width:100%}
+ .toolbar-actions{width:100%;gap:14px;justify-content:space-between;min-width:0}
+ .toolbar .picker{max-width:100%;min-width:0}
+ .training-library,.training-reference,.training-photo-credits,.training-toolbar,.training-intro,.module-content{width:100%;max-width:100%;min-width:0}
+ .training-reference h2{font-size:20px;line-height:1.4}
+ .training-reference p{width:auto;max-width:100%;font-size:15px;line-height:1.75;white-space:normal;overflow-wrap:break-word}
+ .module-footer,.module-materials,.training-course-nav{flex-wrap:wrap;white-space:normal;gap:12px}
+ .module-footer>span{min-width:0;flex:1}
+ .info-strip{padding:16px;gap:12px;min-width:0;max-width:100%;align-items:flex-start}
+ .info-strip p{flex:1;min-width:0;margin:0;font-size:14px;line-height:1.7;white-space:normal;overflow-wrap:break-word}
+ .workspace{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+ .panel-heading{flex-wrap:wrap}.panel-heading>div{min-width:0;max-width:100%}
+ .primary-button,.outline-button{max-width:100%;white-space:normal}
+}
