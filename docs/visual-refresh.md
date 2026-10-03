@@ -1,18 +1,29 @@
 # PhishAware visual refresh
 
-Uses the user-supplied artwork selectively. The two website screenshots guide the warm background, rounded cards, and compact image treatments. Screenshots are reference material, not embedded application controls.
+Uses supplied artwork selectively. Website screenshots guide the warm background, rounded cards, and compact image treatments. Screenshots are reference material, not embedded application controls.
+
+## Current page imagery
 
 | Page | Treatment |
 | --- | --- |
-| Homepage | Image 1 hero, image 9 warning card, image 2 awareness card, image 3 reporting card, image 4 workflow |
-| Sign in and account recovery | Image 1 in the existing split layout |
+| Homepage | Original colleagues photograph and caption restored. Image 9 warning card, image 2 awareness card, image 3 reporting card, image 4 workflow retained. |
+| Sign in and account recovery | Supplied image 5, moved from the simulation heading |
 | Overview | Small image 2 beside the welcome message |
-| Email protection | Small image 9 beside the heading, scanning controls stay visible |
-| Training library | Compact image 4 in the introduction, existing eight lesson photographs retained |
-| Simulation inbox | Image 5 beside the heading, messages stay below |
-| Notifications | Small image 9, active and history controls retained |
+| Email protection | New protected envelope with a shield, check mark and padlock. No attack hook. |
+| Training library | Photograph of four learners reviewing a laptop, separate from all eight lesson photos |
+| Simulation inbox | Photograph of an employee working at a laptop with a visible face |
+| Notifications | Supplied image 1, now separate from homepage and sign in |
 | Settings | No illustration, profile and support content prioritized |
 
-Administrator simulations share the practice artwork. Employees, templates, reports, audit logs, and settings inherit the card and color refresh without large decorative images.
+The three homepage feature-card images and workflow image remain in place. No image repeats within the homepage or training library. All application copies retain original aspect ratios.
 
-Image 6 contains another provider brand and image 7 uses a text-heavy thumbnail. They are excluded. Images 9 and 10 are duplicates, so only image 9 is included. The original uploaded files remain unchanged. Application copies use WebP compression, retaining original aspect ratios.
+## Sources
+
+- Homepage people photo: Mikhail Nilov, https://www.pexels.com/photo/colleagues-using-a-laptop-in-the-office-9301295/
+- Learning group: https://www.pexels.com/photo/group-of-people-working-on-a-laptop-at-a-class-17558054/
+- Simulation employee: https://www.pexels.com/photo/woman-working-on-laptop-in-modern-office-39219751/
+- Photo license: https://www.pexels.com/license/
+- Protected email illustration: generated for PhishAware on October 3, 2026.
+- Other artwork: user-supplied images 1, 2, 3, 4, 5 and 9.
+
+People photos illustrate training and review, without representing actual participation in a phishing exercise. Original uploads are unchanged.
