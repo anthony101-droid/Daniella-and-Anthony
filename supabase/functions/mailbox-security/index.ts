@@ -1,3 +1,4 @@
+import {mailReady,flushMail} from './email.ts';
 import {readBounded} from './security.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.117.2';
 import {summarizeMessage,type GmailMessage} from './analysis.ts';
@@ -55,7 +56,7 @@ Deno.serve(async req=>{
    await db.from('phishaware_email_findings').delete().lt('scanned_at',new Date(Date.now()-30*86400000).toISOString());
    await db.from('phishaware_oauth_states').delete().lt('expires_at',new Date().toISOString());
    await db.from('phishaware_rate_limits').delete().lt('window_start',new Date(Date.now()-86400000).toISOString());
-   return reply({scanned,failed});
+   const delivery=await flushMail(db,3);return reply({scanned,failed,delivery});
   }
   const jwt=req.headers.get('Authorization')?.replace(/^Bearer /i,'');if(!jwt)return reply({error:'Sign in required'},401);
   const {data:{user},error}=await db.auth.getUser(jwt);if(error||!user?.email||!user.email_confirmed_at)return reply({error:'Verified sign-in required'},401);
@@ -63,7 +64,7 @@ Deno.serve(async req=>{
    const {data:box,error:connectionError}=await db.from('phishaware_mailboxes').select('*').eq('user_id',user.id).maybeSingle();if(connectionError)throw Error('Unable to load connection.');
    // Remove local tokens and findings even when Google revocation is unavailable.
    if(box){try{const t=await unseal(box.token_cipher,user.id+':'+box.company_id);await fetch('https://oauth2.googleapis.com/revoke',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:t.refresh_token}),signal:AbortSignal.timeout(10000)});}catch{}}
-   for(const table of ['phishaware_oauth_states','phishaware_mailboxes','phishaware_email_findings']){const {error}=await db.from(table).delete().eq('user_id',user.id);if(error)throw Error('Unable to remove connection data. Try again.');}return reply({disconnected:true});
+   for(const table of ['phishaware_oauth_states','phishaware_mailboxes','phishaware_email_findings','phishaware_notification_history']){const {error}=await db.from(table).delete().eq('user_id',user.id);if(error)throw Error('Unable to remove connection data. Try again.');}return reply({disconnected:true});
   }
   const {data:a,error:accessError}=await db.from('phishaware_access').select('company_id,role,platform_admin').eq('email',user.email.toLowerCase()).maybeSingle();if(accessError||!a)return reply({error:'Invited account required'},403);
   const company=a.company_id;await eligibility(user.id,user.email,company);
@@ -71,12 +72,17 @@ Deno.serve(async req=>{
   if(alertCompany!==company&&!a.platform_admin)return reply({error:'Company access denied'},403);
   const {data:allowed,error:rateError}=await db.rpc('phishaware_take_rate',{bucket_key:'mailbox:'+user.id,max_hits:30,window_seconds:60});if(rateError)throw Error('Unable to check request limits.');if(!allowed)return reply({error:'Too many requests. Retry in one minute.'},429);
   const {data:box,error:boxError}=await db.from('phishaware_mailboxes').select('*').eq('user_id',user.id).eq('company_id',company).maybeSingle();if(boxError)throw Error('Unable to load connection.');
+  if(input.action==='notifications'){
+   const page=Number(input.page??0),query=String(input.query??'');if(!Number.isInteger(page)||page<0||page>100000||query.length>100)return reply({error:'Invalid notification search'},400);
+   const {data,error}=await db.rpc('phishaware_search_notifications',{owner:user.id,company,history:input.history===true,query,page});if(error)throw Error('Unable to search notification history.');return reply({items:(data??[]).slice(0,100),hasMore:(data??[]).length>100});
+  }
   if(input.action==='status'){
    const {data:findings,error}=await db.from('phishaware_email_findings').select('message_id,subject,sender,received_at,scanned_at,risk,reasons,recommendation,review_state,reviewed_at,notification_read').eq('user_id',user.id).eq('company_id',company).order('received_at',{ascending:false}).limit(100);if(error)throw Error('Unable to load findings.');
    const {data:alerts,error:alertsError}=a.role==='Administrator'?await db.from('phishaware_email_alerts').select('id,message_id,employee_email,subject,sender,risk,reasons,recommendation,source,status,created_at,resolved_at').eq('company_id',alertCompany).order('status').order('created_at',{ascending:false}).limit(100):{data:[],error:null};
    if(alertsError)throw Error('Unable to load notifications.');
    const {data:reads,error:readsError}=a.role==='Administrator'?await db.from('phishaware_alert_reads').select('alert_id').eq('user_id',user.id).eq('company_id',alertCompany).limit(10000):{data:[],error:null};if(readsError)throw Error('Unable to load notification receipts.');const readIds=new Set((reads??[]).map((r:{alert_id:string})=>r.alert_id));
-   return reply({alerts:a.role==='Administrator'?(alerts??[]).map((r:{id:string})=>({...r,notification_read:readIds.has(r.id)})):[],configured:configured(),automaticScanning:Deno.env.get('MAILBOX_SCHEDULE_ENABLED')==='true',connection:box?{email:box.email,status:box.status,connectedAt:box.connected_at,lastScanAt:box.last_scan_at,lastError:box.last_error}:null,findings});
+   const {data:notificationCount,error:countError}=await db.rpc('phishaware_notification_count',{owner:user.id,company});if(countError)throw Error('Unable to count notifications.');
+   return reply({notificationCount:Number(notificationCount),emailAlertsConfigured:mailReady(),alerts:a.role==='Administrator'?(alerts??[]).map((r:{id:string})=>({...r,notification_read:readIds.has(r.id)})):[],configured:configured(),automaticScanning:Deno.env.get('MAILBOX_SCHEDULE_ENABLED')==='true',connection:box?{email:box.email,status:box.status,connectedAt:box.connected_at,lastScanAt:box.last_scan_at,lastError:box.last_error}:null,findings});
   }
   if(input.action==='read-notification'){
    if(input.all!==true && (a.role==='Administrator'?typeof input.alertId!=='string'||!/^[a-f0-9-]{36}$/i.test(input.alertId):typeof input.messageId!=='string'||!input.messageId||input.messageId.length>200))return reply({error:'Invalid notification'},400);
@@ -86,7 +92,7 @@ Deno.serve(async req=>{
   if(input.action==='review'){
    if(typeof input.messageId!=='string'||!input.messageId||input.messageId.length>200||!['reviewed','reported'].includes(input.decision))return reply({error:'Invalid review'},400);
    const {data:saved,error}=await db.rpc('phishaware_review_finding',{owner:user.id,company,message:input.messageId,decision:input.decision});
-   if(error)throw Error('Unable to save review.');if(!saved)return reply({error:'Email finding unavailable'},404);return reply({saved:true});
+   if(error)throw Error('Unable to save review.');if(!saved)return reply({error:'Email finding unavailable'},404);await flushMail(db,2).catch(()=>({configured:mailReady(),sent:0,failed:0}));return reply({saved:true,emailAlertsConfigured:mailReady()});
   }
   if(input.action==='resolve-alert'){
    if(a.role!=='Administrator')return reply({error:'Administrator access required'},403);

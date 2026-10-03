@@ -1,3 +1,4 @@
+import {mailReady,flushMail} from './email.ts';
 import {readBounded} from './security.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.117.2';
 import {modules,recordResponse,log,emptyWorkspace,type Workspace} from './platform.ts';
@@ -40,6 +41,25 @@ Deno.serve(async req=>{
   if(!admin&&!employee)return reply({error:'Employee access is inactive. Contact your administrator.'},403);
   const view=()=>({workspace:admin?w:projection(w,employee!.id),revision:row.revision,role:access.role,employeeId:employee?.id??'',companyId,platformAdmin:!!access.platform_admin});
   if(input.action==='load'){const result=view();if(admin){const {data,error}=await db.from('phishaware_access').select('email,status,last_error,updated_at').eq('role','Employee').eq('company_id',companyId);if(error)throw error;const {data:companies,error:companyError}=await db.from('phishaware_team').select('id,state->>organization').order('updated_at',{ascending:false});if(companyError)throw companyError;return reply({...result,invitations:data,companies:access.platform_admin?companies.map(c=>({id:c.id,name:c.organization})):[],companyAdministrators:access.platform_admin?(await db.from('phishaware_access').select('email,status').eq('company_id',companyId).eq('role','Administrator')).data:[]});}return reply(result);}
+  if(input.action==='support-submit'){
+   const category=String(input.category??''),target=String(input.target??''),subject=String(input.subject??'').trim(),message=String(input.message??'').trim();
+   if(!['Complaint','Feedback','Help request'].includes(category)||!['company','platform'].includes(target)||subject.length<3||subject.length>160||message.length<10||message.length>4000)return reply({error:'Complete the subject and message within the allowed lengths.'},400);
+   const {data:permitted,error:limitError}=await db.rpc('phishaware_take_rate',{bucket_key:'support:'+user.id,max_hits:3,window_seconds:3600});if(limitError)throw limitError;if(!permitted)return reply({error:'You have reached the hourly support request limit.'},429);
+   const {data:saved,error}=await db.from('phishaware_support').insert({company_id:companyId,user_id:user.id,email,name:employee?.name??'Administrator',category,target,subject,message}).select('id').single();if(error)throw error;await flushMail(db,2).catch(()=>({configured:mailReady(),sent:0,failed:0}));return reply({id:saved.id,saved:true,emailAlertsConfigured:mailReady()});
+  }
+  if(input.action==='support-list'){
+   let query=db.from('phishaware_support').select('id,company_id,name,email,category,target,subject,message,status,created_at,reply,reply_at');
+   if(admin)query=access.platform_admin?query.or('company_id.eq.'+companyId+',target.eq.platform'):query.eq('company_id',companyId).eq('target','company');else query=query.eq('user_id',user.id).eq('company_id',companyId);
+   const {data,error}=await query.order('created_at',{ascending:false}).limit(100);if(error)throw error;
+   const {data:reads,error:readError}=admin?await db.from('phishaware_support_reads').select('support_id').eq('user_id',user.id).limit(10000):{data:[],error:null};if(readError)throw readError;const ids=new Set((reads??[]).map((r:{support_id:string})=>r.support_id));return reply({items:(data??[]).map((r:{id:string})=>({...r,read:ids.has(r.id)})),emailAlertsConfigured:mailReady()});
+  }
+  if(input.action==='support-read'||input.action==='support-reply'){
+   if(!admin)return reply({error:'Administrator access required'},403);
+   if(typeof input.id!=='string'||!/^[a-f0-9-]{36}$/i.test(input.id))return reply({error:'Invalid support request'},400);
+   const {data:item,error}=await db.from('phishaware_support').select('id,company_id,target').eq('id',input.id).maybeSingle();if(error)throw error;if(!item||(!access.platform_admin&&(item.company_id!==companyId||item.target!=='company')))return reply({error:'Support request unavailable'},403);
+   if(input.action==='support-read'){const {error}=await db.from('phishaware_support_reads').upsert({user_id:user.id,support_id:item.id});if(error)throw error;return reply({saved:true});}
+   const text=String(input.reply??'').trim();if(text.length<3||text.length>4000)return reply({error:'Enter a reply of 3 to 4000 characters.'},400);const {error:updateError}=await db.from('phishaware_support').update({reply:text,reply_at:new Date().toISOString(),status:'answered'}).eq('id',item.id);if(updateError)throw updateError;return reply({saved:true});
+  }
   if(input.action==='admin-metrics'){
    if(!admin)return reply({error:'Administrator access required'},403);
    if(typeof input.start!=='string'||typeof input.end!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(input.start)||!/^\d{4}-\d{2}-\d{2}$/.test(input.end)||!Number.isFinite(Date.parse(input.start))||!Number.isFinite(Date.parse(input.end))||Date.parse(input.end)<Date.parse(input.start)||Date.parse(input.end)-Date.parse(input.start)>366*86400000)return reply({error:'Select a valid report period of up to one year'},400);
