@@ -1,7 +1,7 @@
 import {mailReady,flushMail} from './email.ts';
 import {readBounded} from './security.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.117.2';
-import {modules,recordResponse,log,emptyWorkspace,type Workspace} from './platform.ts';
+import {modules,gradeTraining,recordResponse,log,emptyWorkspace,type Workspace} from './platform.ts';
 const origin='https://daniella-and-anthony.terkperkanthony101.workers.dev';
 const headers={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info','Access-Control-Allow-Methods':'POST,OPTIONS','Content-Type':'application/json','Vary':'Origin','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
 const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -113,8 +113,7 @@ Deno.serve(async req=>{
    if(input.kind==='response'){if(!['opened','clicked','reported'].includes(input.response))return reply({error:'Invalid response'},400);recordResponse(next,input.deliveryId,employee!.id,input.response);}
    else if(input.kind==='notice'){const n=next.notices.find(n=>n.id===input.noticeId&&n.employeeId===employee!.id);if(!n)return reply({error:'Notice unavailable'},403);n.read=true;}
    else if(input.kind==='quiz'){
-    const module=modules.find(m=>m.id===input.moduleId);if(!module||!Array.isArray(input.answers)||input.answers.length!==module.questions.length||input.answers.some((a:unknown)=>!Number.isInteger(a)))return reply({error:'Complete all quiz answers'},400);
-    const score=Math.round(module.questions.filter((q,i)=>q.answer===input.answers[i]).length/module.questions.length*100);
+    const score=gradeTraining(input.moduleId,input.answers);const module=modules.find(m=>m.id===input.moduleId)!;
     const c=next.completions.find(c=>c.employeeId===employee!.id&&c.moduleId===module.id);if(c){c.score=Math.max(c.score,score);c.attempts++;c.date=new Date().toISOString();}else next.completions.push({employeeId:employee!.id,moduleId:module.id,score,attempts:1,date:new Date().toISOString()});log(next,employee!.name,`Submitted ${module.title}: ${score}%`,'Training');
    }else return reply({error:'Invalid employee action'},400);
   }else return reply({error:'Unknown action'},400);
