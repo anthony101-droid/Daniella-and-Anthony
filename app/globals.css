@@ -160,4 +160,7 @@ input[type=checkbox],input[type=radio],progress{accent-color:#167A45}
 .admin-review-result.review-safe strong{color:#167A45}
 .admin-review-result p{color:#263238;margin:6px 0;font-size:14px}
 .admin-review-result .review-rating-note{font-size:12px;color:#526474}
+.lesson-step-navigation{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:20px 0;color:#526474;font-size:14px}
+.lesson-step-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+.lesson-step-actions button{flex:1;white-space:normal}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,.public-home :focus-visible,.redesigned-home a:focus-visible,.redesigned-home button:focus-visible{outline:3px solid #167A45;outline-offset:4px}
