@@ -30,8 +30,10 @@ Deno.serve(async req=>{
    const {data:existing,error:existingError}=await db.from('phishaware_access').select('email').eq('email',target).maybeSingle();if(existingError)throw existingError;
    if(existing)return reply({error:'This email already belongs to a workspace. Use an email without an existing workspace.'},409);
    const personName=String(input.personName??'').trim();if(input.personName!==undefined&&(personName.length<2||personName.length>100))return reply({error:'Individual name must contain 2 to 100 characters'},400);
+   const department=String(input.department??'General').trim(),jobRole=String(input.jobRole??'Employee').trim();
+   if(!department||department.length>80||!jobRole||jobRole.length>100)return reply({error:'Enter department and job role within the allowed lengths'},400);
    const id=crypto.randomUUID(),state=emptyWorkspace();state.organization=name;
-   if(personName)state.employees.push({id:crypto.randomUUID(),name:personName,email:target,department:'General',active:true,joined:new Date().toISOString()});
+   if(personName)state.employees.push({id:crypto.randomUUID(),name:personName,email:target,department,jobRole,active:true,joined:new Date().toISOString()});
    const {error:companyError}=await db.from('phishaware_team').insert({id,state,revision:1,audit_actor:email});if(companyError)throw companyError;
    const {error:memberError}=personName?{error:null}:await db.from('phishaware_access').insert({email:target,company_id:id,role:'Administrator',status:'failed',invited_by:user.id});
    if(memberError){await db.from('phishaware_team').delete().eq('id',id);throw memberError;}
@@ -41,7 +43,17 @@ Deno.serve(async req=>{
   const w=row.state as Workspace;const employee=w.employees.find(e=>e.id===access.employee_id&&e.email.toLowerCase()===email&&e.active);
   if(!admin&&!employee)return reply({error:'Employee access is inactive. Contact your administrator.'},403);
   const view=()=>({workspace:admin?w:projection(w,employee!.id),revision:row.revision,role:access.role,employeeId:employee?.id??'',companyId,platformAdmin:!!access.platform_admin});
-  if(input.action==='load'){const result=view();if(admin){const {data,error}=await db.from('phishaware_access').select('email,status,last_error,updated_at').eq('role','Employee').eq('company_id',companyId);if(error)throw error;const {data:companies,error:companyError}=await db.from('phishaware_team').select('id,state->>organization').order('updated_at',{ascending:false});if(companyError)throw companyError;return reply({...result,invitations:data,companies:access.platform_admin?companies.map(c=>({id:c.id,name:c.organization})):[],companyAdministrators:access.platform_admin?(await db.from('phishaware_access').select('email,status').eq('company_id',companyId).eq('role','Administrator')).data:[]});}return reply({...result,...await courseRecord(user.id,companyId)});}
+  if(input.action==='load'){
+   const result=view();if(!admin)return reply({...result,...await courseRecord(user.id,companyId)});
+   const {data:members,error:memberError}=await db.from('phishaware_access').select('email,status,last_error,updated_at,role,company_id').eq('company_id',companyId);if(memberError)throw memberError;
+   let companies:{id:string;name:string;people:unknown[]}[]=[];
+   if(access.platform_admin){
+    const {data:teams,error:teamError}=await db.from('phishaware_team').select('id,state').order('id');if(teamError)throw teamError;
+    const invites:{email:string;status:string;company_id:string}[]=[];for(let offset=0;;offset+=500){const {data:page,error:inviteError}=await db.from('phishaware_access').select('email,status,company_id').order('email').range(offset,offset+499);if(inviteError)throw inviteError;invites.push(...(page??[]));if(!page||page.length<500)break;}
+    companies=(teams??[]).map(t=>({id:t.id,name:t.state.organization,people:(t.state.employees??[]).filter((e:{active:boolean})=>e.active).map((e:{id:string;name:string;email:string;department:string;jobRole?:string})=>({...e,status:invites?.find(i=>i.company_id===t.id&&i.email===e.email.toLowerCase())?.status??'Not invited'}))})).sort((a,b)=>a.name.localeCompare(b.name));
+   }
+   return reply({...result,invitations:members?.filter(m=>m.role==='Employee'),companies,companyAdministrators:access.platform_admin?members?.filter(m=>m.role==='Administrator'):[]});
+  }
   if(input.action==='support-submit'){
    const category=String(input.category??''),target=String(input.target??''),subject=String(input.subject??'').trim(),message=String(input.message??'').trim();
    if(!['Complaint','Feedback','Help request'].includes(category)||!['company','platform'].includes(target)||subject.length<3||subject.length>160||message.length<10||message.length>4000)return reply({error:'Complete the subject and message within the allowed lengths.'},400);
@@ -66,7 +78,16 @@ Deno.serve(async req=>{
    if(typeof input.start!=='string'||typeof input.end!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(input.start)||!/^\d{4}-\d{2}-\d{2}$/.test(input.end)||!Number.isFinite(Date.parse(input.start))||!Number.isFinite(Date.parse(input.end))||Date.parse(input.end)<Date.parse(input.start)||Date.parse(input.end)-Date.parse(input.start)>366*86400000)return reply({error:'Select a valid report period of up to one year'},400);
    const {data,error}=await db.from('phishaware_daily_metrics').select('day,scanned,low,medium,high,alerts,reports').eq('company_id',companyId).gte('day',input.start).lt('day',input.end).order('day');if(error)throw error;
    const {data:first,error:firstError}=await db.from('phishaware_daily_metrics').select('day').eq('company_id',companyId).order('day').limit(1);if(firstError)throw firstError;
-   return reply({workspace:w,days:data,coverageStart:first?.[0]?.day??null});
+   // Only shared alert summaries are included. Private mailbox findings stay owner-only.
+   const allRows=async(table:string,columns:string,dateColumn:string)=>{
+    const records:unknown[]=[];for(let offset=0;;offset+=500){const {data:page,error}=await db.from(table).select(columns).eq('company_id',companyId).gte(dateColumn,input.start+'T00:00:00Z').lt(dateColumn,input.end+'T00:00:00Z').order(dateColumn).order('id').range(offset,offset+499);if(error)throw error;records.push(...(page??[]));if(!page||page.length<500)break;if(records.length>=20000)throw Error('This report is too large. Select a shorter period.');}return records;
+   };
+   const [sharedEmails,reviewedEmails,actions]=await Promise.all([
+    allRows('phishaware_email_alerts','id,employee_email,subject,sender,risk,reasons,recommendation,source,status,created_at,resolved_at,request_kind,review_outcome,review_note','created_at'),
+    allRows('phishaware_email_alerts','id,employee_email,subject,sender,risk,reasons,recommendation,source,status,created_at,resolved_at,request_kind,review_outcome,review_note','resolved_at'),
+    allRows('phishaware_audit','id,date,actor,category,action,source','date')
+   ]);
+   return reply({workspace:w,days:data,coverageStart:first?.[0]?.day??null,sharedEmails,reviewedEmails,actions});
   }
   if(input.action==='audit'){
    if(!admin)return reply({error:'Administrator access required'},403);
@@ -108,6 +129,7 @@ Deno.serve(async req=>{
    next=input.workspace;
    if(!next||next.version!==1||typeof next.organization!=='string'||!['employees','campaigns','deliveries','completions','events','notices'].every(k=>Array.isArray((next as unknown as Record<string,unknown>)[k])))return reply({error:'Invalid workspace'},400);
    if(next.employees.some(e=>typeof e.email!=='string'||typeof e.id!=='string')||new Set(next.employees.map(e=>e.email.toLowerCase())).size!==next.employees.length)return reply({error:'Employee emails must be unique'},400);
+   if(next.employees.some(e=>e.jobRole!==undefined&&(typeof e.jobRole!=='string'||e.jobRole.length>100)))return reply({error:'Job role must be text of up to 100 characters'},400);
    // Training scores are written only by verified employee quiz submissions.
    next.completions=w.completions.filter(c=>next.employees.some(e=>e.id===c.employeeId&&w.employees.some(old=>old.id===e.id&&old.email.toLowerCase()===e.email.toLowerCase())));
   }else if(input.action==='employee'){

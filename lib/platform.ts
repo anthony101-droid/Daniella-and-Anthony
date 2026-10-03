@@ -1,4 +1,4 @@
-export type Employee={id:string;name:string;email:string;department:string;active:boolean;joined:string};
+export type Employee={id:string;name:string;email:string;department:string;jobRole?:string;active:boolean;joined:string};
 export type Campaign={id:string;name:string;templateId:string;subject:string;sender:string;body:string;department:string;status:'Draft'|'Active'|'Completed';created:string;launched?:string;due:string};
 export type Delivery={id:string;campaignId:string;employeeId:string;opened:boolean;clicked:boolean;reported:boolean;created:string};
 export type CourseCertificate={id:string;courseTitle:string;employeeName:string;companyName:string;issuedAt:string;moduleIds:string[]};
