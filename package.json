@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node -e \"for (const dir of ['.next', 'out']) require('node:fs').rmSync(dir, { recursive: true, force: true })\" && next build",
     "start": "next start",
     "lint": "eslint app components/platform.tsx lib/platform.ts",
     "typecheck": "tsc --noEmit"
