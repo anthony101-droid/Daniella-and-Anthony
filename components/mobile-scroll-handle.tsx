@@ -4,7 +4,7 @@ export default function MobileScrollHandle(){
  const track=useRef<HTMLDivElement>(null),drag=useRef<{pointer:number;y:number;scroll:number}|null>(null);
  const [position,setPosition]=useState(0),[available,setAvailable]=useState(false),[dragging,setDragging]=useState(false);
  useEffect(()=>{
-  let frame=0;const update=()=>{frame=0;const max=document.documentElement.scrollHeight-window.innerHeight;setAvailable(max>80);setPosition(max>0?Math.max(0,Math.min(100,window.scrollY/max)):0);};
+  let frame=0;const update=()=>{frame=0;const max=document.documentElement.scrollHeight-window.innerHeight;setAvailable(max>80);setPosition(max>0?Math.max(0,Math.min(100,window.scrollY/max*100)):0);};
   const schedule=()=>{if(!frame)frame=requestAnimationFrame(update);};
   const observer=new ResizeObserver(schedule);observer.observe(document.body);window.addEventListener('scroll',schedule,{passive:true});window.addEventListener('resize',schedule);window.visualViewport?.addEventListener('resize',schedule);update();
   return()=>{observer.disconnect();window.removeEventListener('scroll',schedule);window.removeEventListener('resize',schedule);window.visualViewport?.removeEventListener('resize',schedule);cancelAnimationFrame(frame);};
