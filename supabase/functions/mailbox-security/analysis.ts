@@ -25,3 +25,13 @@ export function inspectMessage(message:GmailMessage):Assessment{
  return {risk,reasons,recommendation:risk==='High'?'Do not follow links or open attachments. Report the message to your company security contact and verify through a known channel.':risk==='Medium'?'Pause and verify the sender through a known contact method before responding or following links.':'Confirm the message is expected. Low risk is not proof of safety. Use your normal security checks before taking action.'};
 }
 export function summarizeMessage(message:GmailMessage){const hs=message.payload?.headers??[],get=(n:string)=>hs.find(h=>h.name.toLowerCase()===n.toLowerCase())?.value??'';return {message_id:message.id,subject:get('Subject').slice(0,300),sender:get('From').slice(0,300),received_at:new Date(Number(message.internalDate)||Date.now()).toISOString(),...inspectMessage(message)};}
+
+// Preview text only. Never return HTML markup, inline images, or attachment contents.
+export function messagePreview(message:GmailMessage){
+ const plain:string[]=[],html:string[]=[],attachments:string[]=[];let parts=0,truncated=false;
+ function walk(p:MailPart,depth=0){if(depth>8||++parts>100){truncated=true;return;}if(p.filename){attachments.push(p.filename.slice(0,200));return;}if(p.body?.data&&(p.mimeType==='text/plain'||p.mimeType==='text/html')){if(p.body.data.length>140000)truncated=true;const value=decode(p.body.data.slice(0,140000));(p.mimeType==='text/plain'?plain:html).push(value);}for(const child of p.parts??[])walk(child,depth+1);}
+ if(message.payload)walk(message.payload);
+ const clean=(value:string)=>value.replace(/<(script|style|head)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,'').replace(/<(?:br|\/p|\/div|\/tr)\b[^>]*>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&(?:amp|lt|gt|quot|apos|nbsp);/gi,v=>({'&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&apos;':"'",'&nbsp;':' '}[v.toLowerCase()]??v)).trim();
+ const source=plain.length?plain.join('\n\n'):html.length?clean(html.join('\n\n')):clean(message.snippet??'');
+ return {text:source.slice(0,50000),excerpt:(!plain.length&&!html.length)||truncated||source.length>50000,attachments:attachments.slice(0,50)};
+}

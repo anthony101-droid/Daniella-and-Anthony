@@ -274,3 +274,14 @@ body{position:relative}
  .audit-controls{display:flex;flex-direction:column;align-items:stretch;gap:12px}.audit-controls label{width:100%;min-width:0}.audit-controls input{width:100%;min-width:0}
  .audit-pagination{flex-wrap:wrap;gap:10px}.audit-pagination span{white-space:nowrap}
 }
+
+.mobile-page-scroll{display:none}
+.email-content-preview{margin:20px 0}.email-text-panel{margin-top:14px;padding:18px;border:1px solid #D9E4EC;border-radius:9px;background:#F5F9FC;min-width:0}
+.email-text-panel pre{font-family:inherit;font-size:14px;line-height:1.75;white-space:pre-wrap;word-break:normal;overflow-wrap:anywhere;margin:14px 0;max-width:100%;max-height:480px;overflow-y:auto}
+@media(max-width:767px){
+ .mobile-page-scroll{display:block;position:fixed;right:0;top:24dvh;height:50dvh;width:26px;z-index:35;pointer-events:none}
+ .mobile-page-scroll:before{content:'';position:absolute;right:4px;top:0;bottom:0;width:4px;background:rgba(15,39,66,.12);border-radius:4px}
+ .mobile-scroll-thumb{position:absolute;right:0;width:26px;height:48px;border:0;border-radius:8px;background:#0F2742;color:#FFFFFF;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;pointer-events:auto;touch-action:none;user-select:none;cursor:grab;box-shadow:0 1px 5px rgba(15,39,66,.2)}
+ .mobile-scroll-thumb span{display:block;width:10px;height:2px;background:#FFFFFF;border-radius:1px}.mobile-scroll-thumb:focus-visible{outline:3px solid #167A45;outline-offset:2px}.mobile-page-scroll.dragging .mobile-scroll-thumb{background:#167A45;cursor:grabbing}
+ .workspace{padding-right:30px}.email-text-panel{padding:16px}.email-text-panel pre{font-size:15px}
+}

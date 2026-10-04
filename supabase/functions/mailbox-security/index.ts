@@ -1,7 +1,7 @@
 import {mailReady,flushMail} from './email.ts';
 import {readBounded} from './security.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.117.2';
-import {summarizeMessage,type GmailMessage} from './analysis.ts';
+import {summarizeMessage,messagePreview,type GmailMessage} from './analysis.ts';
 const origin='https://daniella-and-anthony.terkperkanthony101.workers.dev';
 const scope='https://www.googleapis.com/auth/gmail.readonly';
 const headers={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info','Access-Control-Allow-Methods':'POST,OPTIONS','Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Vary':'Origin'};
@@ -72,6 +72,17 @@ Deno.serve(async req=>{
   if(alertCompany!==company&&!a.platform_admin)return reply({error:'Company access denied'},403);
   const {data:allowed,error:rateError}=await db.rpc('phishaware_take_rate',{bucket_key:'mailbox:'+user.id,max_hits:30,window_seconds:60});if(rateError)throw Error('Unable to check request limits.');if(!allowed)return reply({error:'Too many requests. Retry in one minute.'},429);
   const {data:box,error:boxError}=await db.from('phishaware_mailboxes').select('*').eq('user_id',user.id).eq('company_id',company).maybeSingle();if(boxError)throw Error('Unable to load connection.');
+  if(input.action==='message-content'){
+   if(typeof input.messageId!=='string'||!/^[a-zA-Z0-9_-]{1,128}$/.test(input.messageId))return reply({error:'Invalid email selection'},400);
+   if(!box||box.status!=='connected')return reply({error:'Connect your Google mailbox first.'},409);
+   const {data:finding,error:recordError}=await db.from('phishaware_email_findings').select('message_id').eq('user_id',user.id).eq('company_id',company).eq('message_id',input.messageId).maybeSingle();
+   if(recordError)throw Error('Unable to check email access.');if(!finding)return reply({error:'This email is unavailable in your mailbox findings.'},403);
+   const credentials=await unseal(box.token_cipher,user.id+':'+company);
+   const tokens=await googleToken({grant_type:'refresh_token',refresh_token:credentials.refresh_token});
+   if(tokens.refresh_token){const {error}=await db.from('phishaware_mailboxes').update({token_cipher:await seal({refresh_token:tokens.refresh_token},user.id+':'+company)}).eq('user_id',user.id).eq('company_id',company);if(error)throw Error('Unable to update connection.');}
+   const message=await gmail('messages/'+encodeURIComponent(input.messageId)+'?format=full',tokens.access_token) as GmailMessage;
+   return reply(messagePreview(message));
+  }
   if(input.action==='notifications'){
    const page=Number(input.page??0),query=String(input.query??'');if(!Number.isInteger(page)||page<0||page>100000||query.length>100)return reply({error:'Invalid notification search'},400);
    const {data,error}=await db.rpc('phishaware_search_notifications',{owner:user.id,company,history:input.history===true,query,page});if(error)throw Error('Unable to search notification history.');return reply({items:(data??[]).slice(0,100),hasMore:(data??[]).length>100});
