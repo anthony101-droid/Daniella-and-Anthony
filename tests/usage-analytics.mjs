@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const module={exports:{}};
+vm.runInNewContext(ts.transpileModule(readFileSync('lib/usage-analytics.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module,exports:module.exports});
+const {usagePayload}=module.exports;
+test('analytics rejects unrecognized events and private page values',()=>{assert.equal(usagePayload('private_email_received'),null);const p=usagePayload('workspace_page_opened','employee@example.com');assert.equal(p.properties.page,undefined);assert.equal(p.properties.$process_person_profile,false);assert.equal(p.properties.$geoip_disable,true);});
+test('analytics includes only approved page names and excludes irrelevant page fields',()=>{assert.equal(usagePayload('workspace_page_opened','training').properties.page,'training');assert.equal(usagePayload('email_reported','training').properties.page,undefined);assert.deepEqual(Object.keys(usagePayload('email_reported').properties).sort(),['$geoip_disable','$process_person_profile']);});

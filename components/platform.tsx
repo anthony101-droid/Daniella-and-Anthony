@@ -1,4 +1,5 @@
 'use client';
+import {announceUsage} from '@/lib/usage-analytics';
 import {useEffect,useState,useRef,type ReactNode,type FormEvent} from 'react';
 import {ShieldCheck,LayoutDashboard,Mail,Users,BookOpen,BarChart3,History,Settings,Bell,Plus,Search,Download,Check,ChevronRight,ChevronDown,Send,Eye,MousePointer2,Flag,FileText,CheckCircle2,TriangleAlert,Inbox,Monitor,LockKeyhole,Building2,Database,Link2,Upload,CalendarDays,GraduationCap,PauseCircle,UserRound,LogOut,RefreshCw} from 'lucide-react';
 import {SidebarProvider,Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarGroup,SidebarGroupLabel,SidebarMenu,SidebarMenuItem,SidebarMenuButton,SidebarInset,SidebarTrigger,useSidebar} from '@/components/ui/sidebar';
@@ -51,7 +52,7 @@ export default function Platform({certificate,certificatePending,initialWorkspac
  const myDeliveries=w.deliveries.filter(d=>d.employeeId===employeeId);
  const [openingEmail,setOpeningEmail]=useState(false);
  const navigationVersion=useRef(0);
- const nav=(p:Page)=>{const request=++navigationVersion.current;const open=()=>{setPage(p);window.scrollTo({top:0,behavior:'instant'});setSearch('');setDepartment('All departments');setSelectedModule(null);setSelectedDelivery(null);};if(p==='email-protection'&&onOpenEmailProtection){setOpeningEmail(true);void onOpenEmailProtection().catch(e=>toast.error((e as Error).message)).finally(()=>{if(navigationVersion.current===request){setOpeningEmail(false);open();}});}else{setOpeningEmail(false);open();}};
+ const nav=(p:Page)=>{const request=++navigationVersion.current;const open=()=>{announceUsage('workspace_page_opened',p);setPage(p);window.scrollTo({top:0,behavior:'instant'});setSearch('');setDepartment('All departments');setSelectedModule(null);setSelectedDelivery(null);};if(p==='email-protection'&&onOpenEmailProtection){setOpeningEmail(true);void onOpenEmailProtection().catch(e=>toast.error((e as Error).message)).finally(()=>{if(navigationVersion.current===request){setOpeningEmail(false);open();}});}else{setOpeningEmail(false);open();}};
  const browserState=useRef({workspace:w,role,employeeId});useEffect(()=>{browserState.current={workspace:w,role,employeeId};},[w,role,employeeId]);
  useEffect(()=>{
   const context=(document as Document & {modelContext?:{registerTool:(tool:unknown,options:{signal:AbortSignal})=>void|Promise<void>}}).modelContext;
