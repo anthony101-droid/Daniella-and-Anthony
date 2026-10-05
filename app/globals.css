@@ -325,3 +325,23 @@ body{position:relative}
  .home-capability-strip{margin:0 16px;padding:16px 8px;gap:10px;background:white;border:1px solid #D9E4EC;border-radius:16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.home-capability-strip span{flex-direction:column;text-align:center;font-size:10px;line-height:1.6;gap:7px}
  .redesigned-home .home-features{padding:35px 16px}.redesigned-home .home-section-title h2,.redesigned-home .home-workflow h2{font-size:28px;line-height:1.2}.redesigned-home .home-feature-grid{gap:16px}.redesigned-home .home-feature-grid article{border-radius:18px}.feature-content{padding:20px}.feature-visual{height:170px}.redesigned-home .home-workflow{margin:0 16px 24px;padding:20px;border-radius:20px;gap:24px}.redesigned-home .home-trust{margin:0 16px 24px;padding:20px;border-radius:18px}.redesigned-home .home-cta{padding:12px 16px 30px;gap:20px}.redesigned-home .home-cta h2{font-size:27px}.redesigned-home .home-footer{padding:20px 16px}
 }
+
+/* Clear forms and calm loading states, shared across mobile and desktop. */
+.support-form{display:grid;gap:18px;max-width:720px;margin-top:22px}
+.support-form label,.request-search{display:flex;flex-direction:column;gap:7px;font-size:14px;font-weight:600;color:#0F2742;min-width:0}
+.support-form .form-input,.request-search .form-input{width:100%;min-height:46px;font-weight:400;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:10px;padding:12px;color:#263238}
+.support-form textarea.form-input{min-height:130px;resize:vertical}
+.support-form .form-input::placeholder,.request-search .form-input::placeholder{color:#617182;opacity:1}
+.support-form>.primary-button{justify-self:start;min-height:46px;padding:12px 24px}
+.support-request{padding:20px;margin-top:16px;border:1px solid #D9E4EC;border-radius:14px;background:#FFFFFF}
+.support-request>p,.support-request>small{display:block;margin-top:10px;overflow-wrap:anywhere}
+.request-search{flex:1}
+.outline-button.danger-button{color:#C62828;border-color:#C62828;background:#FFFFFF}
+.outline-button.danger-button:hover{background:#FFF3F3}
+.loading-placeholder{padding:12px 0;min-height:160px}
+.loading-placeholder-row{display:flex;align-items:center;gap:14px;margin:16px 0}
+.loading-placeholder-icon{width:42px;height:42px;border-radius:12px;background:#E7EEF4;flex:none}
+.loading-placeholder-row>div{flex:1;min-width:0}
+.loading-placeholder-line{display:block;height:13px;width:75%;border-radius:6px;background:#E7EEF4}
+.loading-placeholder-line.short{width:48%;height:10px;margin-top:10px;background:#EDF2F6}
+@media(max-width:767px){.support-form{gap:16px}.support-form>.primary-button{width:100%;justify-self:stretch}.support-form .form-input,.request-search .form-input{font-size:16px}.support-request{padding:16px}.request-search{width:100%}}
