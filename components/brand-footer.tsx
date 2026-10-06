@@ -1,0 +1,1 @@
+export default function BrandFooter(){return <footer className="brand-attribution" aria-label="Copyright and platform attribution"><span>© {new Date().getFullYear()} AnTrek Technology. All rights reserved.</span><span>PhishAware · Powered by <strong>AnTrek Technology</strong></span></footer>;}

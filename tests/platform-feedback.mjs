@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const module={exports:{}};
+vm.runInNewContext(ts.transpileModule(readFileSync('lib/platform-feedback.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module,exports:module.exports});
+const {platformFeedback}=module.exports;
+test('ratings and comments use the saved private platform-owner support channel',()=>{const p=platformFeedback(4,'  The lessons were useful.  ');assert.equal(p.category,'Feedback');assert.equal(p.target,'platform');assert.equal(p.action,'support-submit');assert.match(p.message,/Platform rating: 4\/5\n\nThe lessons were useful\./);assert.match(p.subject,/4\/5/);assert.ok(p.message.length<=4000);});
+test('rating validation rejects missing, fractional and out-of-range ratings',()=>{for(const rating of [0,6,2.5,NaN])assert.throws(()=>platformFeedback(rating,'Useful training materials'));});
+test('comments must satisfy server limits after the rating prefix is added',()=>{assert.throws(()=>platformFeedback(5,'short'));assert.throws(()=>platformFeedback(5,'x'.repeat(3901)));assert.ok(platformFeedback(5,'x'.repeat(3900)).message.length<=4000);});
