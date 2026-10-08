@@ -375,3 +375,16 @@ body{position:relative}
 .simulation-feedback ul {padding-left:20px;line-height:1.7}
 .simulation-feedback h4 {margin-top:16px}
 @media(max-width:767px){.simulation-setup ol{grid-template-columns:minmax(0,1fr)}.simulation-feedback{padding:16px}.simulation-feedback button{width:100%;white-space:normal}}
+
+/* Floating mobile workspace tabs, above the device safe area. */
+@media(max-width:767px){
+ .mobile-bottom-nav{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));max-width:480px;margin-inline:auto;border:1px solid #D9E4EC;border-radius:999px;box-shadow:0 8px 28px #0F27421A;padding:7px;gap:3px;isolation:isolate}
+ .mobile-bottom-nav button{min-height:50px;border-radius:999px;padding:10px 0;gap:0;color:#0F2742;flex-shrink:0}
+ .mobile-bottom-nav button.is-active{background:#EAF4EE;color:#167A45}
+ .mobile-bottom-nav .mobile-nav-icon{display:flex;align-items:center;justify-content:center;width:28px;height:28px}
+ .mobile-bottom-nav .mobile-nav-icon>svg{width:26px;height:26px;stroke-width:2}
+ .mobile-bottom-nav button.is-active .mobile-nav-icon>svg{stroke-width:2.5}
+ .mobile-bottom-nav .mobile-nav-icon i{top:-6px;left:18px;background:#C62828;min-width:20px;height:20px;padding:0 4px;font-size:10px;font-weight:700;border:2px solid #FFFFFF;border-radius:999px}
+ .mobile-bottom-nav .mobile-nav-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+ .mobile-bottom-nav button:focus-visible{outline:2px solid #167A45;outline-offset:-2px}
+}
