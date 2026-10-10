@@ -363,10 +363,18 @@ body{position:relative}
 
 .home-footer nav{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:#0F2742}.home-footer nav a{text-decoration:underline;text-underline-offset:4px}
 
-.simulation-setup {margin-bottom:24px}
-.simulation-setup ol {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 36px;padding-left:24px;margin:20px 0 0}
-.simulation-setup li {padding-left:6px}
-.simulation-setup li::marker {color:#167A45;font-weight:700}
+.simulation-setup {margin-bottom:24px;padding:24px;min-width:0}
+.simulation-setup-heading h2 {margin:0;font-size:21px;line-height:1.4;color:#0F2742}
+.simulation-setup-heading p {max-width:680px;color:#526477;font-size:14px}
+.simulation-setup .simulation-setup-steps {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;list-style:none;padding:0;margin:20px 0 0}
+.simulation-setup-steps>li {display:flex;align-items:flex-start;gap:14px;min-width:0;padding:20px;border:1px solid #D9E4EC;border-radius:12px;background:#F5F9FC}
+.simulation-step-number {display:grid;place-items:center;flex:0 0 32px;height:32px;border-radius:50%;background:#EAF4EE;color:#167A45;font-size:14px;font-weight:700}
+.simulation-setup-steps>li>div {min-width:0;flex:1}
+.simulation-setup-steps h3 {color:#0F2742;font-size:16px;line-height:1.5;margin:3px 0 8px}
+.simulation-setup-steps p {font-size:14px;overflow-wrap:anywhere}
+.simulation-company-summary strong,.simulation-company-summary span {display:block}
+.simulation-company-summary span {color:#526477;font-size:13px;margin-top:3px}
+.simulation-setup-steps button {margin-top:10px;min-height:44px;max-width:100%;white-space:normal;text-align:center;color:#167A45;border-color:#167A45;font-size:14px}
 .simulation-setup p,.simulation-audience p,.simulation-feedback p {line-height:1.6;margin:8px 0}
 .simulation-audience {margin:16px 0}
 .simulation-audience ul {list-style:none;padding:0;max-height:220px;overflow-y:auto;overscroll-behavior:contain}
@@ -374,7 +382,8 @@ body{position:relative}
 .simulation-feedback {background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:20px;margin:20px 0}
 .simulation-feedback ul {padding-left:20px;line-height:1.7}
 .simulation-feedback h4 {margin-top:16px}
-@media(max-width:767px){.simulation-setup ol{grid-template-columns:minmax(0,1fr)}.simulation-feedback{padding:16px}.simulation-feedback button{width:100%;white-space:normal}}
+@media(max-width:1000px){.simulation-setup .simulation-setup-steps{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:767px){.simulation-setup{padding:18px 16px}.simulation-setup-steps>li{padding:16px;gap:12px}.simulation-setup-steps button{width:100%}.simulation-feedback{padding:16px}.simulation-feedback button{width:100%;white-space:normal}}
 
 /* Floating mobile workspace tabs, above the device safe area. */
 @media(max-width:767px){
