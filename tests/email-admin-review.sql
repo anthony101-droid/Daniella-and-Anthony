@@ -16,6 +16,7 @@ begin
  if public.phishaware_complete_email_review(outsider,outsider||'@example.invalid',company,aid,'safe','') then raise exception 'Cross-company access granted';end if;
  if not public.phishaware_complete_email_review(admin,admin||'@example.invalid',company,aid,'safe','Sender verified through a known contact') then raise exception 'Admin decision failed';end if;
  if not exists(select 1 from public.phishaware_notification_history where user_id=employee and message_id='safe-test' and review_outcome='safe' and not notification_read and risk='Medium') then raise exception 'Employee decision notification missing or risk changed';end if;
+ if not exists(select 1 from public.phishaware_notification_history where user_id=employee and message_id='safe-test' and review_note like '%Original scan: Medium risk.%' and review_note like '%Test warning%' and review_note like '%Administrator details: Sender verified through a known contact%') then raise exception 'Automatic summary or administrator details missing';end if;
  if not exists(select 1 from public.phishaware_audit where company_id=company and actor=admin||'@example.invalid' and category='Email review') then raise exception 'Review audit missing';end if;
  n:=public.phishaware_notification_count(employee,company);if n<>1 then raise exception 'Unread count wrong: %',n;end if;
  if public.phishaware_complete_email_review(admin,admin||'@example.invalid',company,aid,'safe','Duplicate') then raise exception 'Duplicate completion accepted';end if;
@@ -24,6 +25,14 @@ begin
  perform public.phishaware_read_notifications(employee,company,false,'safe-test');
  if public.phishaware_notification_count(employee,company)<>0 then raise exception 'Read count did not reset';end if;
  if not exists(select 1 from public.phishaware_search_notifications(employee,company,true,'',0) where review_outcome='safe') then raise exception 'Read decision lost from history';end if;
+ perform public.phishaware_store_finding(employee,company,'{"message_id":"blank-note-test","subject":"Reported invoice","sender":"sender@example.invalid","received_at":"2026-10-03T20:00:00Z","risk":"Medium","reasons":["Reply address mismatch"],"recommendation":"Verify sender"}');
+ perform public.phishaware_review_finding(employee,company,'blank-note-test','reported');
+ select id into aid from public.phishaware_email_alerts where user_id=employee and message_id='blank-note-test';
+ if not public.phishaware_complete_email_review(admin,admin||'@example.invalid',company,aid,'safe','') then raise exception 'One-click safe review failed';end if;
+ if not exists(select 1 from public.phishaware_notification_history where user_id=employee and message_id='blank-note-test' and not notification_read and review_outcome='safe' and review_note like '%Reported invoice%' and review_note like '%Original scan: Medium risk.%' and review_note like '%Reply address mismatch%' and review_note like '%marked safe%' and length(review_note)<=1000) then raise exception 'Automatic employee review summary missing';end if;
+ if not exists(select 1 from public.phishaware_email_alerts where id=aid and status='resolved' and review_note like '%Reported invoice%') then raise exception 'Admin summary missing';end if;
+ if not exists(select 1 from public.phishaware_email_findings where user_id=employee and message_id='blank-note-test' and risk='Medium' and review_note like '%Reply address mismatch%') then raise exception 'Finding summary missing or scan rating changed';end if;
+ if public.phishaware_notification_count(employee,company)<>1 then raise exception 'Automatic review did not create unread notification';end if;
  perform public.phishaware_store_finding(employee,company,'{"message_id":"action-test","subject":"High risk test","sender":"sender@example.invalid","received_at":"2026-10-03T20:00:00Z","risk":"High","reasons":["Test warning"],"recommendation":"Do not open"}');
  perform public.phishaware_review_finding(employee,company,'action-test','reported');
  select id into aid from public.phishaware_email_alerts where user_id=employee and message_id='action-test';
