@@ -4,6 +4,7 @@ import {useEffect,useRef,useState,type FormEvent} from 'react';
 import type {User} from '@supabase/supabase-js';
 import {supabase,passwordSetupRequested} from '@/lib/supabase';
 import type {Workspace,CourseCertificate} from '@/lib/platform';
+import {mergeSavedCompany} from '@/lib/company-save';
 import Platform from './platform';
 import MailboxSecurity,{CompanyOnboarding,EmailNotifications,useMailboxSecurity} from './mailbox-security';
 import AccountSettings from './account-settings';
@@ -25,7 +26,7 @@ export default function CloudPlatform(){
  useEffect(()=>{let live=true;void supabase.auth.getUser().then(({data})=>{if(live){setUser(data.user);setChecked(true);}});const {data}=supabase.auth.onAuthStateChange((event,session)=>{if(live){setUser(session?.user??null);setChecked(true);if(event==='PASSWORD_RECOVERY')setSetup(true);}});return ()=>{live=false;data.subscription.unsubscribe();};},[]);
  const signedInUserId=user?.id;
  useEffect(()=>{let live=true;void Promise.resolve().then(()=>{if(live){setAccess(null);setError('');failed.current=false;}});if(!signedInUserId)return;void api({action:'load',companyId}).then(data=>{if(live){announceUsage('workspace_opened');revision.current=data.revision;setAccess(data);setStatus('Changes saved');}}).catch(e=>{if(live){setError(e.message);setStatus('Access unavailable');}});return ()=>{live=false;};},[signedInUserId,refresh,companyId]);
- function save(workspace:Workspace){if(access?.role!=='Administrator')return;setStatus('Saving…');queue.current=queue.current.then(async()=>{if(failed.current)return;const data=await api({action:'save',companyId,workspace,revision:revision.current});revision.current=data.revision;setStatus('Changes saved');}).catch(e=>{failed.current=true;setError(e.message);setStatus('Not saved');});}
+ function save(workspace:Workspace){if(access?.role!=='Administrator')return;const targetCompanyId=access.companyId;setStatus('Saving…');queue.current=queue.current.then(async()=>{if(failed.current)return;const data=await api({action:'save',companyId:targetCompanyId,workspace,revision:revision.current});revision.current=data.revision;setAccess(current=>current&&current.companyId===targetCompanyId?mergeSavedCompany(current,data.workspace,data.revision):current);setStatus('Changes saved');}).catch(e=>{failed.current=true;setError(e.message);setStatus('Not saved. Reload the workspace before retrying.');});}
  function employeeAction(action:Record<string,unknown>):Promise<Workspace>{const task=employeeQueue.current.then(async()=>{const data=await api({action:'employee',companyId,...action});revision.current=data.revision;setAccess(current=>current?{...current,...data}:current);setStatus('Changes saved');if(action.kind==='quiz')announceUsage('training_submitted');return data.workspace as Workspace;});employeeQueue.current=task.then(()=>{},()=>{});return task;}
 
  async function invite(ids:string[]){await queue.current;if(failed.current)throw Error('Reload and save the workspace before inviting.');const data=await api({action:'invite',companyId,employeeIds:ids});const loaded=await api({action:'load',companyId});setAccess(loaded);revision.current=loaded.revision;return data.outcomes as {email?:string;sent?:boolean;error?:string}[];}
